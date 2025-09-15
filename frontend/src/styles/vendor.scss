@@ -1,0 +1,7 @@
+// Import Bootstrap
+@use "~bootstrap/scss/bootstrap.scss";
+
+// FontAwesome (uses "resolve-url-loader" to fix relative imports)
+// $fa-font-path: "~@fortawesome/fontawesome-free/webfonts";
+@use '@fortawesome/fontawesome-free/scss/fontawesome.scss';
+@use "~@fortawesome/fontawesome-free/scss/solid.scss";

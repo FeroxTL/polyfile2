@@ -1,0 +1,19 @@
+<!doctype html>
+{% load render_bundle from webpack_loader %}
+{% load i18n %}
+{% get_current_language as LANGUAGE_CODE %}
+<html lang="{{ LANGUAGE_CODE }}" translate="no">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Polyfile</title>
+    <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'disk_dashboard' '/' %}" />
+    <script id="dashboard-urls" type="application/json">{{dashboard_urls|safe}}</script>
+    {% render_bundle 'vendor' 'css' %}
+    {% render_bundle 'dashboard' 'css' %}
+  </head>
+  <body>
+    {% render_bundle 'vendor' 'js' %}
+    {% render_bundle 'dashboard' 'js' %}
+  </body>
+</html>

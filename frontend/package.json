@@ -1,0 +1,31 @@
+{
+  "devDependencies": {
+    "@babel/plugin-transform-react-jsx": "^7.29.7",
+    "babel-loader": "^9.2.1",
+    "css-loader": "^7.1.4",
+    "mini-css-extract-plugin": "^2.10.2",
+    "sass": ">=1.75.0 <3.0.0",
+    "sass-loader": "^16.0.0",
+    "style-loader": "^4.0.0",
+    "webpack": "^5.108.4",
+    "webpack-bundle-tracker": "^3.2.4",
+    "webpack-cli": "^7.2.1"
+  },
+  "name": "polyfile",
+  "version": "0.1.0",
+  "description": "File manager frontend",
+  "main": "index.js",
+  "scripts": {
+    "watch": "webpack --config config/webpack.config.cjs --mode development --watch --output-path ../web_dev_assets/bundles",
+    "build_dev": "webpack --config config/webpack.config.cjs --mode development --output-path ../web_dev_assets/bundles",
+    "build": "webpack --config config/webpack.config.cjs --mode production --output-path ../polyfile/web_assets/bundles"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.1",
+    "bootstrap": "^5.3.8",
+    "mithril": "^2.3.8",
+    "resolve-url-loader": "^5.0.0"
+  }
+}

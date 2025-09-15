@@ -1,0 +1,22 @@
+# IDE
+.idea
+
+# SQLite databases
+*.sqlite3
+*.sqlite
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+*.py[cod]
+.venv
+
+# Artifacts
+media
+
+# build
+dist
+webpack-dev-stats.json
+web_dev_assets/
+polyfile/web_assets

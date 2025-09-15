@@ -1,0 +1,14 @@
+[project]
+name = "polyfile"
+version = "0.1.0"
+description = "File manager"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "django==5.2.16",
+    "django-cte==3.0.0",
+    "django-environ>=0.14.0",
+    "django-webpack-loader==3.2.4",
+    "marshmallow==4.3.0",
+    "python-magic>=0.4.27",
+]
