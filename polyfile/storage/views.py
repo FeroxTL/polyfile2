@@ -16,7 +16,7 @@ from polyfile.storage.decorators import catch_storage_exceptions
 from polyfile.application.exceptions import NotFound, PermissionDenied
 from polyfile.storage.models import FsNode, FsNodeTypeChoices, TempUpload, ChunkedStatus
 from polyfile.storage.tokens import default_token_generator
-from polyfile.storage.utils import get_md5_sum, get_mime_type
+from polyfile.storage.utils import get_mime_type
 
 
 def serve(request: HttpRequest, fs_node: FsNode, as_attachment: bool = False):
