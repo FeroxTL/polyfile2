@@ -19,7 +19,8 @@ function uploadFile(e) {
     .then((data) => {
       // Update FsNodeList
       const fsNode = new FsNode(data);
-      FsNodeList.elements.push(fsNode);
+      FsNodeList.addFsNode(fsNode);
+      FsNodeList.selectFsNode(fsNode);
 
       // Upload file content
       return m.request({

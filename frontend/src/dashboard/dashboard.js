@@ -24,6 +24,18 @@ function FsNode(data) {
   this.selected = false;
 };
 
+/**
+  Available sorters.
+ */
+const Sorters = {
+  default: (a, b) => {
+    if (a.type === "directory" && b.type !== "directory") return -1;
+    if (a.type !== "directory" && b.type === "directory") return 1;
+    return a.name.localeCompare(b.name);
+  },
+};
+
+
 // File list data
 const FsNodeList = {
   current: null,
@@ -43,8 +55,8 @@ const FsNodeList = {
     .then((data) => {
       this.error = null;
       this.current = new FsNode(data.current);
-      this.elements.length = 0;
-      data.children.map((child) => (this.elements.push(new FsNode(child))));
+      const sorter = Sorters[this.current.sorting || "default"];
+      this.elements = data.children.map((child) => new FsNode(child)).sort(sorter);
     })
     .catch(error => {
       FsNodeList.error = error;
@@ -58,6 +70,20 @@ const FsNodeList = {
     FsNodeList.elements.forEach((item) => {
       item.selected = (item == fsNode)
     });
+  },
+
+  /**
+    Add FsNode respecting sorting
+   */
+  addFsNode(fsNode) {
+    const sorter = Sorters[this.current.sorting || "default"];
+    for (let i = 0; i < this.elements.length; i++) {
+      if (sorter(this.elements[i], fsNode) > 0) {
+        this.elements.splice(i, 0, fsNode);
+        return;
+      }
+    };
+    this.elements.push(fsNode);
   },
 };
 

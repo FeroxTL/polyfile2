@@ -55,7 +55,7 @@ const CreateDirectoryModalComponent = {
     }).then((data) => {
       closeModal(this.modalId);
       const fsNode = new FsNode(data);
-      FsNodeList.elements.push(fsNode);
+      FsNodeList.addFsNode(fsNode);
       FsNodeList.selectFsNode(fsNode);
     }, (error) => {
       if (400 < error.code && error.code < 500) {
