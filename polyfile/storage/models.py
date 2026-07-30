@@ -5,6 +5,7 @@ import uuid
 from django.conf import settings
 from django.core import exceptions
 from django.db import models
+from django.utils.timezone import now
 from django.utils.translation import gettext as _
 
 from polyfile.storage import model_fields
@@ -202,3 +203,9 @@ class TempUpload(models.Model):
     status = models.PositiveSmallIntegerField(choices=ChunkedStatus, default=ChunkedStatus.UPLOADING)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_on = models.DateTimeField(null=True, blank=True)
+
+    def mark_complete(self) -> None:
+        """Mart as complete."""
+        self.status = ChunkedStatus.COMPLETE
+        self.completed_on = now()
+        self.save(update_fields=('status', 'completed_on'))

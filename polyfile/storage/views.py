@@ -1,22 +1,19 @@
-import hashlib
 import uuid
 from pathlib import Path
 
 from django.contrib.auth.decorators import login_not_required
-from django.core.files.uploadedfile import TemporaryUploadedFile
 from django.http import HttpRequest, Http404, HttpResponseNotModified, FileResponse, response
 from django.utils.http import http_date
-from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.static import was_modified_since
 
 from polyfile.application.api_v1 import api_v1_schemas
+from polyfile.storage.backends import BaseStorageBackend
 from polyfile.storage.decorators import catch_storage_exceptions
 from polyfile.application.exceptions import NotFound, PermissionDenied
 from polyfile.storage.models import FsNode, FsNodeTypeChoices, TempUpload, ChunkedStatus
 from polyfile.storage.tokens import default_token_generator
-from polyfile.storage.utils import get_mime_type
 
 
 def serve(request: HttpRequest, fs_node: FsNode, as_attachment: bool = False):
@@ -69,36 +66,21 @@ def download_file_view(request: HttpRequest, pk: uuid.UUID, token: str):
 def upload_file_view(request: HttpRequest, token: str):
     """Upload file."""
     try:
-        token: TempUpload = TempUpload.objects.select_related('fs_node').get(
+        temp_upload: TempUpload = TempUpload.objects.select_related('fs_node').get(
             token=token,
             status=ChunkedStatus.UPLOADING,
+            fs_node__file='',
         )
     except TempUpload.DoesNotExist:
         raise NotFound('Upload not found')  # TODO: specify/translate error text
 
-    # TODO: if backend supports create file?
-    # TODO: InMemoryUploadedFile for small files
-    file = TemporaryUploadedFile(token.fs_node.name, None, None, None, None)
+    storage: BaseStorageBackend = temp_upload.fs_node.file.storage
+    storage.save_file(
+        fs_node=temp_upload.fs_node,
+        request=request,
+    )
 
-    file_size = 0
-    hash_md5 = hashlib.md5()
-    while chunk := request.read(65536):  # TODO: settings
-        chunk_length = len(chunk)
-        hash_md5.update(chunk)
-        file.write(chunk)
-        file_size += chunk_length
+    # Mark TempUpload as complete
+    temp_upload.mark_complete()
 
-    file.size = file_size
-
-    token.fs_node.file = file
-    token.fs_node.size = file.size
-    token.fs_node.md5 = hash_md5.hexdigest()
-    token.fs_node.mime_type = get_mime_type(file)
-    token.fs_node.save()
-    file.close()
-
-    token.status = ChunkedStatus.COMPLETE
-    token.completed_on = now()
-    token.save(update_fields=('status', 'completed_on'))
-
-    return response.JsonResponse(data=api_v1_schemas.FsNodeCreateFileRequestSchema().dump(token.fs_node))
+    return response.JsonResponse(api_v1_schemas.FsNodeItemSchema().dump(temp_upload.fs_node))

@@ -86,14 +86,16 @@ class FsNodeTouchApiView(BaseApiView):
             fs_node_type=FsNodeTypeChoices.FILE,
         )
         temp_upload = TempUpload.objects.create(fs_node=fs_node)
-        fs_node.upload_url = reverse('upload_file', kwargs={'token': temp_upload.token})
 
-        return http.JsonResponse(data=api_v1_schemas.FsNodeCreateFileRequestSchema().dump(fs_node))
+        return http.JsonResponse({
+            **api_v1_schemas.FsNodeItemSchema().dump(fs_node),
+            'upload_url': reverse('upload_file', kwargs={'token': temp_upload.token})
+        })
 
 
 class DashboardContextView(BaseApiView):
     @staticmethod
     def get(request: http.HttpRequest) -> http.HttpResponse:
-        return http.JsonResponse(data={
+        return http.JsonResponse({
             'sidebar_urls': list(map(asdict, get_sidebar_urls(request.user)))
         })

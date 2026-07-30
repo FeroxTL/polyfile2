@@ -94,10 +94,6 @@ class FsNodeCreateRequestSchema(Schema):
     path = PathField(required=True)
 
 
-class FsNodeCreateFileRequestSchema(FsNodeItemSchema):
-    upload_url = fields.Str(dump_only=True)
-
-
 def get_fs_node_name_validator() -> fields.validate.Validator:
     """Validate FsNode.name."""
     # TODO: add validation for control characters
