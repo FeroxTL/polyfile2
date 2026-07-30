@@ -41,7 +41,6 @@ and integrates seamlessly with Django’s built-in authentication system.
 - 0.2.0
   - SPA
     - [x] Handle correct order when FsNode created / renamed
-    - [ ] Cache some data in HTML for '/disk/...' requests
     - [ ] Simple file viewer (at least images)
     - [ ] Shared access / public download
     - [ ] Remove nested directories (async?)

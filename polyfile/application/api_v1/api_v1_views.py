@@ -1,5 +1,7 @@
+import pathlib
 from dataclasses import asdict
 
+import marshmallow
 from django import http
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse
@@ -10,6 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from polyfile.accounts.models import User
 from polyfile.accounts.utils import get_sidebar_urls
 from polyfile.application.api_v1 import api_v1_schemas, api_v1_exceptions, api_v1_managers
+from polyfile.application.api_v1.api_v1_schemas import PathField
 from polyfile.application.exceptions import Unauthorized, HttpException
 from polyfile.storage.models import FsNodeTypeChoices, TempUpload
 
@@ -37,14 +40,25 @@ class FsNodeListApiView(BaseApiView):
         """Retrieve FsNode (file/directory) by path and its children (if any)."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
-        fs_node_with_children = api_v1_managers.get_fs_node_with_children(user=request.user, request_params=request.GET)
+        try:
+            params = api_v1_schemas.FsNodeListRequestSchema().load(request.GET)
+        except marshmallow.ValidationError as e:
+            raise api_v1_exceptions.FieldValidationError(detail=e.messages)
+
+        fs_node_with_children = api_v1_managers.get_fs_node_with_children(user=request.user, path=params['path'])
         return http.JsonResponse(data=api_v1_schemas.FsNodeListResponseSchema().dump(fs_node_with_children))
 
     @staticmethod
     def delete(request: http.HttpRequest) -> http.HttpResponse:
         """Remove FsNode."""
         assert request.user.is_authenticated and isinstance(request.user, User)
-        api_v1_managers.remove_fs_node(user=request.user, request_params=request.GET)
+
+        try:
+            params = api_v1_schemas.FsNodeRemoveRequestSchema().load(request.GET)
+        except marshmallow.ValidationError as e:
+            raise api_v1_exceptions.FieldValidationError(detail=e.messages)
+
+        api_v1_managers.remove_fs_node(user=request.user, path=params['path'])
         return http.HttpResponse(status=204)
 
 

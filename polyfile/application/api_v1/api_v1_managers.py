@@ -1,3 +1,4 @@
+import pathlib
 import typing
 from dataclasses import dataclass
 from pathlib import PurePosixPath
@@ -19,27 +20,20 @@ class FsNodeWithChildren:
     children: typing.Iterable[FsNode]
 
 
-def get_fs_node_with_children(user: User, request_params: http.QueryDict) -> FsNodeWithChildren:
+def get_fs_node_with_children(user: User, path: PurePosixPath) -> FsNodeWithChildren:
     """
     Retrieve FsNode (file/directory) by path and its children (if any).
 
     :param user: directory owner.
-    :param request_params: params.
+    :param path: listed path.
     :raises HttpException: most of the errors.
     :return FsNodeWithChildren: current FsNode and child FsNodes.
     """
-    params: api_v1_schemas.FsNodeListRequestParams
-
     try:
-        params = api_v1_schemas.FsNodeListRequestSchema().load(request_params)
-    except marshmallow.ValidationError as e:
-        raise api_v1_exceptions.FieldValidationError(detail=e.messages)
-
-    try:
-        fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=params['path'])
+        fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=path)
     except FsNode.DoesNotExist:
         raise api_v1_exceptions.FsNodeNotFoundError(
-            detail='Can not access "%s" - no such file or directory' % params['path'],
+            detail='Can not access "%s" - no such file or directory' % path,
         )
 
     if fs_node is None:
@@ -128,30 +122,23 @@ def create_fs_node(
     return fs_node
 
 
-def remove_fs_node(user: User, request_params: http.QueryDict) -> None:
+def remove_fs_node(user: User, path: pathlib.PurePosixPath) -> None:
     """
     Remove FsNode (file/directory) by path.
 
     Directory must be empty.
 
     :param user: directory owner.
-    :param request_params: params.
+    :param path: target path with FSNode name included.
     :raises HttpException: most of the errors.
     """
-    params: api_v1_schemas.FsNodeListRequestParams
-
     try:
-        params = api_v1_schemas.FsNodeRemoveRequestSchema().load(request_params)
-    except marshmallow.ValidationError as e:
-        raise api_v1_exceptions.FieldValidationError(detail=e.messages)
-
-    try:
-        fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=params['path'])
+        fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=path)
         if fs_node is None:
             raise FsNode.DoesNotExist
     except FsNode.DoesNotExist:
         raise api_v1_exceptions.FsNodeNotFoundError(
-            detail='Can not access "%s" - no such file or directory' % params['path'],
+            detail='Can not access "%s" - no such file or directory' % path,
         )
 
     if fs_node.is_file:

@@ -33,13 +33,6 @@ class FsNodeIsNotADirectoryError(HttpException):
     description = _('Target path is not not a directory.')
 
 
-class DirectoryExistsError(HttpException):
-    # TODO DEPRECATED
-    status_code = 409
-    error_code = 'DirectoryExistsError'
-    description = _('Target directory already exists.')
-
-
 class FsNodeExistsError(HttpException):
     status_code = 409
     error_code = 'FsNodeExistsError'

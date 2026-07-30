@@ -2,8 +2,10 @@ import logging
 from typing import Type
 
 from django.apps.registry import apps
-from django.core.files.storage import StorageHandler, Storage, InvalidStorageError
+from django.core.files.storage import StorageHandler, InvalidStorageError
 from django.utils.functional import cached_property
+
+from polyfile.storage.backends import BaseStorageBackend
 
 
 def _get_backend_options() -> dict[str, dict]:
@@ -11,14 +13,17 @@ def _get_backend_options() -> dict[str, dict]:
     apps.check_models_ready()
     storage_model = apps.get_model(app_label="storage", model_name="Storage", require_ready=True)
     return {
-        instance.pk: {
+        instance.id: {
             "BACKEND": instance.backend,
             "OPTIONS": instance.options,
-        } for instance in storage_model.objects.all()
+        } for instance in storage_model.objects.values_list('id', 'backend', 'options', named=True)
     }
 
 
 class FsStorageHandler(StorageHandler):
+    _backends: dict | None
+    _storages: dict
+
     @cached_property
     def backends(self) -> None:
         if self._backends is None:
@@ -33,10 +38,10 @@ class FsStorageHandler(StorageHandler):
         self.__dict__.pop("backends", None)
 
 
-def register_backend(storage_cls: Type[Storage], name: str = "") -> None:
+def register_backend(storage_cls: Type[BaseStorageBackend], name: str = "") -> None:
     """Register storage backend."""
-    if not issubclass(storage_cls, Storage):
-        raise InvalidStorageError(f"Invalid backend class {storage_cls!r}: must subclass Storage")
+    if not issubclass(storage_cls, BaseStorageBackend):
+        raise InvalidStorageError(f"Invalid backend class {storage_cls!r}: must subclass BaseStorageBackend")
 
     backend = f"{storage_cls.__module__}.{storage_cls.__name__}"
 

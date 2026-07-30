@@ -8,5 +8,4 @@ from polyfile.storage.models import Storage
 @receiver([post_save, post_delete], sender=Storage)
 def _invalidate_storages(**kwargs) -> None:
     """Invalidate storages caches."""
-    # TODO: remove clear (slow); separate addition and deletion
     fs_storages.clear()
