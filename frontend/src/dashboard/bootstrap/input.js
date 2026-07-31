@@ -2,7 +2,9 @@ import m from "mithril";
 
 const Input = {
   view(vnode) {
-    if (!vnode.attrs.stream) throw new Error("Argument 'stram' is required");
+    if (!vnode.attrs.stream) {
+      throw new Error("Argument 'stram' is required")
+    };
 
     const { errors, required, stream } = vnode.attrs;
 
@@ -11,7 +13,7 @@ const Input = {
         oncreate: () => vnode.attrs.autofocus && vnode.dom.focus(),
         value: stream(),
         class: Array.isArray(errors) && errors.length ? "is-invalid" : "",
-        required: required,
+        required,
         oninput: (event) => {
           stream(event.target.value);
           if (vnode.attrs.oninput) {

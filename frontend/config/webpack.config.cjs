@@ -1,6 +1,7 @@
 const path = require("path");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const BundleTracker = require("webpack-bundle-tracker");
+const ESLintPlugin = require('eslint-webpack-plugin');
 
 const rootDir = path.resolve(__dirname, "..");
 const srcDir = path.resolve(rootDir, "src");
@@ -32,6 +33,11 @@ module.exports = (env, argv) => {
       clean: true,
     },
     plugins: [
+      new ESLintPlugin({
+        configType: 'flat',
+        context: path.resolve(__dirname, '../'),
+        extensions: ['js', 'jsx', 'ts', 'tsx', 'cjs'],
+      }),
       new MiniCssExtractPlugin({
         filename: "static/css/[name].[contenthash].css",
         linkType: "text/css",

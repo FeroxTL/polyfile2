@@ -1,10 +1,10 @@
-import m from "mithril";
-import { FsNodeList, FsNode } from "../dashboard";
+import { FsNode, FsNodeList } from "../dashboard";
 import { API_V1_FSNODE_TOUCH } from "../urls";
+import m from "mithril";
 
 
-function uploadFile(e) {
-  Array.from(e.target.files).map((file) => {
+const uploadFile = (e) => {
+  Array.from(e.target.files).map((file) => (
     // Create FsNode
     m.request({
       method: "POST",
@@ -13,7 +13,7 @@ function uploadFile(e) {
         "Content-Type": "application/json",
       },
       params: {
-        "path": FsNodeList.current.path + "/" + file.name,
+        "path": `${FsNodeList.current.path}/${file.name}`,
       },
     })
     .then((data) => {
@@ -29,14 +29,15 @@ function uploadFile(e) {
         body: file,
         // Bypasses default JSON.stringify
         serialize: (value) => value,
-      }).then((data) => {
-        Object.assign(fsNode, data);
+      }).then((uploadData) => {
+        Object.assign(fsNode, uploadData);
       })
     })
     .catch((error) => {
-      console.log('err', error)  // TODO: error handling
-    });
-  })
+      // TODO: error handling
+      console.log('err', error);
+    })
+  ));
 }
 
 export { uploadFile };

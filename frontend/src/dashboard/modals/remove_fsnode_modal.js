@@ -1,26 +1,28 @@
-import m from "mithril";
 import {
   Modal,
   closeModal,
 } from "../bootstrap/modal";
+import { API_V1_FSNODE } from "../urls";
+import Button from "../bootstrap/button";
 import {
   FsNodeList,
 } from "../dashboard";
-import { API_V1_FSNODE } from "../urls";
-import Button from "../bootstrap/button";
+import m from "mithril";
 
 
-function getDetailFromError(error) {
-  if (error.code == 0 || error.response == null) {
+const ERROR_CODE_ZERO = 0;
+
+const getDetailFromError = (error) => {
+  if (error.code === ERROR_CODE_ZERO || error.response === null) {
     return "Unknown error, please try again later";
   }
   if (Object.hasOwn(error.response, "detail")) {
     if (Array.isArray(error.response.detail)) {
       return error.response.detail.join("; ");
-    } else {
-      return String(error.response.detail);
-    }
+    } 
+    return String(error.response.detail);
   }
+  return "";
 };
 
 const RemoveFsNodeModalComponent = {
@@ -32,13 +34,16 @@ const RemoveFsNodeModalComponent = {
   sendRequest(state) {
     state.error = null;
 
+    // TODO: really remove only first?
+    const ZERO_ELEMENT = 0;
+
     return m.request({
       method: "DELETE",
       url: API_V1_FSNODE,
-      params: { path: FsNodeList.current.path + "/" + state.removeList[0].name },
+      params: { path: `${FsNodeList.current.path  }/${  state.removeList[ZERO_ELEMENT].name}` },
     }).then(() => {
       closeModal(this.modalId);
-      FsNodeList.elements = FsNodeList.elements.filter((item) => item != state.removeList[0]);
+      FsNodeList.elements = FsNodeList.elements.filter((item) => item !== state.removeList[ZERO_ELEMENT]);
 
     }, (error) => {
       state.error = error;

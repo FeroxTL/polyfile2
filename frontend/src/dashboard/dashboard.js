@@ -9,6 +9,9 @@ import RemoveFsNodeModalComponent from "./modals/remove_fsnode_modal";
 import { uploadFile } from "./modals/uploader";
 
 
+const XHR_READY_STATE_DONE = 4;
+
+
 // FsNode model
 function FsNode(data) {
   this.name = data.name || "";
@@ -29,8 +32,8 @@ function FsNode(data) {
  */
 const Sorters = {
   default: (a, b) => {
-    if (a.type === "directory" && b.type !== "directory") return -1;
-    if (a.type !== "directory" && b.type === "directory") return 1;
+    if (a.type === "directory" && b.type !== "directory") {return -1;}
+    if (a.type !== "directory" && b.type === "directory") {return 1;}
     return a.name.localeCompare(b.name);
   },
 };
@@ -44,7 +47,7 @@ const FsNodeList = {
   xhr: null,
   // Function to load data using m.request
   load(path) {
-    if (this.xhr !== null) this.xhr.abort();
+    if (this.xhr !== null) {this.xhr.abort();}
 
     return m.request({
       method: "GET",
@@ -68,7 +71,7 @@ const FsNodeList = {
   selectFsNode(fsNode) {
     // Select fs_node and remove selection from others
     FsNodeList.elements.forEach((item) => {
-      item.selected = (item == fsNode)
+      item.selected = (item === fsNode)
     });
   },
 
@@ -90,16 +93,16 @@ const FsNodeList = {
 // FsNode breadcrumbs component
 const FsNodeListBreadcrumbsComponent = {
   view() {
-    if (FsNodeList.current == null) {return};
+    if (FsNodeList.current === null) {return null};
 
     return (
       m("nav[aria-label=breadcrumb]",
         m("ol.breadcrumb mb-0", FsNodeList.current.path.split("/").map((item, index, array) => {
-          const isLast = index === array.length - 1;
-          const itemName = index === 0 ? "Files" : item;
-          const url = encodeURIComponent("/disk" + array.slice(0, index + 1).join("/")).replaceAll("%2F", "/");
+          const isLast = index === array.length - 1,
+           itemName = index === 0 ? "Files" : item,
+           url = encodeURIComponent(`/disk${  array.slice(0, index + 1).join("/")}`).replaceAll("%2F", "/");
           return m("li.breadcrumb-item", {
-            class: isLast ? "active" : undefined,
+            class: isLast ? "active" : null,
           }, isLast ? itemName : m(m.route.Link, { href: url }, itemName))
         }))
       )
@@ -127,20 +130,20 @@ const FsNodeEmptyDirectoryComponent = {
       )
     )
   }
-}
+};
 
 // Available actions for the selected item
 const FsNodeActionbarComponent = {
   view() {
     const selectedList = FsNodeList.elements.filter(item => item.selected);
-    const selectedItem = selectedList.length == 1 ? selectedList[0] : null;
+    const selectedItem = selectedList.length === 1 ? selectedList[0] : null;
 
     return (
       m(".row app-ignore-selection", [
         m(".col py-2 text-nowrap overflow-hidden", m("span",
-          selectedList.length == 1
-            && m("span", m("i.h5 mb-0 fa d-none d-lg-inline", { class: selectedItem.type == "directory" ? "fa-folder" : "fa-file" }), [" ", selectedItem.name])
-            || "Selected " + selectedList.length + " items"
+          selectedList.length === 1
+            && m("span", m("i.h5 mb-0 fa d-none d-lg-inline", { class: selectedItem.type === "directory" ? "fa-folder" : "fa-file" }), [" ", selectedItem.name])
+            || `Selected ${  selectedList.length  } items`
         )),
         // TODO: tooltip?
         // TODO: m(Button) ?
@@ -198,18 +201,18 @@ const FsNodeListComponent = {
     document.removeEventListener("click", this.onDocumentClick);
   },
 
-  navigate(fs_node, event) {
-    if (fs_node.type != "file") {
-      m.route.set(DASHBOARD_ROOT_URL, {key: encodeURIComponent(FsNodeList.current.path + "/" + fs_node.name).replaceAll("%2F", "/")});
+  navigate(fsNode, event) {
+    if (fsNode.type !== "file") {
+      m.route.set(DASHBOARD_ROOT_URL, {key: encodeURIComponent(`${FsNodeList.current.path  }/${  fsNode.name}`).replaceAll("%2F", "/")});
     };
     event.preventDefault();
     return false;
   },
 
   view() {
-    if (FsNodeList.error != null) {
+    if (FsNodeList.error !== null) {
       let errorMessage = FsNodeList.error.message;
-      if (FsNodeList.error.code == 0) {
+      if (FsNodeList.error.code === 0) {
         errorMessage = "Unknown error, please try again later";
       } else if (FsNodeList.error.response && FsNodeList.error.response.detail) {
         errorMessage = FsNodeList.error.response.detail;
@@ -220,7 +223,7 @@ const FsNodeListComponent = {
           m(".card-header", "Error"),
           m(".card-body", [
             m("p.card-text", errorMessage),
-            (FsNodeList.error.code == 0) &&
+            (FsNodeList.error.code === 0) &&
               m("a", {href: "#", class: "btn btn-primary me-2", onclick: () => window.location.reload()}, "Refresh page") ||
               m(m.route.Link, {href: "/disk/", class: "btn btn-primary me-2"}, "Main page"),
           ])
@@ -228,10 +231,11 @@ const FsNodeListComponent = {
       )
     }
 
-    if (FsNodeList.xhr !== null && FsNodeList.xhr.readyState != 4) {
+    if (FsNodeList.xhr !== null && FsNodeList.xhr.readyState !== XHR_READY_STATE_DONE) {
       return m("div.flex-grow-1", [
         m(FsNodeListBreadcrumbsComponent),
-        m("p", "Loading.."), // TODO: Add loading placeholders https://getbootstrap.com/docs/5.2/components/placeholders/
+        // TODO: Add loading placeholders https://getbootstrap.com/docs/5.2/components/placeholders/
+        m("p", "Loading.."),
       ])
     };
 
@@ -242,13 +246,13 @@ const FsNodeListComponent = {
           && m(".card mb-2 text-bg-dark sticky-top", m(".card-body p-2", m(FsNodeActionbarComponent)))
           || m(".card mb-2", m(".card-body", m(FsNodeListBreadcrumbsComponent))),
 
-        (FsNodeList.elements.length == 0) && m(FsNodeEmptyDirectoryComponent),
+        (FsNodeList.elements.length === 0) && m(FsNodeEmptyDirectoryComponent),
 
         m("ul.list-group user-select-none", FsNodeList.elements.map((item) => (
           m("li[role=button].list-group-item list-group-item-action list-group-item-light py-3 d-flex justify-content-between", {
             key: item.name,
             class: item.selected ? "active" : null,
-            'aria-current': item.selected ? String(item.selected) : undefined,
+            'aria-current': item.selected ? String(item.selected) : null,
             onclick: (e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -256,7 +260,7 @@ const FsNodeListComponent = {
             },
             ondblclick: this.navigate.bind(null, item),
           }, [
-            m("span", m("i.h4 mb-0 fa", { class: item.type == "directory" ? "fa-folder" : "fa-file" })),
+            m("span", m("i.h4 mb-0 fa", { class: item.type === "directory" ? "fa-folder" : "fa-file" })),
             m("span.flex-grow-1 ms-2", item.name),
             m("span.d-none .d-sm-block", item.type),
           ])
@@ -269,7 +273,8 @@ const FsNodeListComponent = {
 const DashboardView = {
   oninit(vnode) {
     FsNodeList.load(vnode.attrs.key);
-    vnode.state.activeId = "files";  // TODO: how to get? from url?
+    // TODO: how to get? from url?
+    vnode.state.activeId = "files";
   },
 
   view(vnode) {
@@ -277,10 +282,10 @@ const DashboardView = {
 
     return [
       m(".d-flex w-100", [
-        m(DashboardSideBar, { items: sidebarUrls, activeId: vnode.state.activeId }),
+        m(DashboardSideBar, { activeId: vnode.state.activeId, items: sidebarUrls }),
         m(".flex-grow-1 vh-100 overflow-y-auto bg-light",
           m(".container-fluid", [
-             m(DashboardNavBar, { items: sidebarUrls, activeId: vnode.state.activeId }),
+             m(DashboardNavBar, { activeId: vnode.state.activeId, items: sidebarUrls }),
              m(FsNodeListComponent),
           ])
         ),

@@ -1,29 +1,32 @@
-import m from "mithril";
-import stream from "mithril/stream";
+import {
+  FsNode,
+  FsNodeList
+} from "../dashboard";
 import {
   Modal,
   closeModal,
 } from "../bootstrap/modal";
-import {
-  FsNodeList,
-  FsNode
-} from "../dashboard";
 import { API_V1_FSNODE_MKDIR } from "../urls";
-import Input from "../bootstrap/input";
 import Button from "../bootstrap/button";
+import Input from "../bootstrap/input";
+import m from "mithril";
+import stream from "mithril/stream";
 
+const ERROR_CODE_ZERO = 0;
+const RESPONSE_BAD_REQUEST = 400;
+const RESPONSE_SERVER_ERROR = 500;
 
-function getDetailFromError(error) {
-  if (error.code == 0 || error.response == null) {
+const getDetailFromError = (error) => {
+  if (error.code === ERROR_CODE_ZERO || error.response === null) {
     return "Unknown error, please try again later";
   }
   if (Object.hasOwn(error.response, "detail")) {
     if (Array.isArray(error.response.detail)) {
       return error.response.detail.join("; ");
-    } else {
-      return String(error.response.detail);
-    }
+    } 
+    return String(error.response.detail);
   }
+  return "";
 };
 
 const CreateDirectoryModalComponent = {
@@ -36,7 +39,7 @@ const CreateDirectoryModalComponent = {
 
   validateValue(vnode, value) {
     vnode.state.fieldErrors.length = 0;
-    const slashRegex = /^[^\/]*$/gm;
+    const slashRegex = /^[^/]*$/ugm;
     if (!slashRegex.test(value)) {
       vnode.state.fieldErrors.push("Do no use symbol \"/\"");
     };
@@ -51,14 +54,14 @@ const CreateDirectoryModalComponent = {
     return m.request({
       method: "POST",
       url: API_V1_FSNODE_MKDIR,
-      params: { path: FsNodeList.current.path + "/" + state.valueStream() },
+      params: { path: `${FsNodeList.current.path  }/${  state.valueStream()}` },
     }).then((data) => {
       closeModal(this.modalId);
       const fsNode = new FsNode(data);
       FsNodeList.addFsNode(fsNode);
       FsNodeList.selectFsNode(fsNode);
     }, (error) => {
-      if (400 < error.code && error.code < 500) {
+      if (error.code >= RESPONSE_BAD_REQUEST && error.code < RESPONSE_SERVER_ERROR) {
         state.fieldErrors.push(getDetailFromError(error));
       } else {
         state.error = error;
@@ -78,7 +81,7 @@ const CreateDirectoryModalComponent = {
         },
         onsubmit: (e) => {
           e.preventDefault();
-          if (vnode.state.fieldErrors.length) return;
+          if (vnode.state.fieldErrors.length) {return;}
           this.sendRequest(vnode.state);
         },
       }, [

@@ -29,7 +29,7 @@ const _ModalBackdrop = {
     vnode.dom.classList.remove("show");
     vnode.state.show = false;
 
-    return new Promise(function(resolve) {
+    return new Promise((resolve) => {
       vnode.dom.addEventListener("transitionend", resolve)
     })
   },
@@ -49,7 +49,7 @@ const _ModalBackdrop = {
 // Backdrop wrapper
 const ModalBackdrop = {
   view() {
-    if (activeModals.size == 0) return;
+    if (activeModals.size === 0) {return null;}
 
     return (
       m(_ModalBackdrop)
@@ -57,21 +57,10 @@ const ModalBackdrop = {
   }
 };
 
-// Modal wrapper
-const Modal = {
-  view(vnode) {
-    if (!activeModals.has(vnode.attrs.modalId)) return;
-
-    return (
-      m(_Modal, vnode.attrs, vnode.children)
-    )
-  }
-};
-
 // Main body of modal, separated for animations
 const _Modal = {
   oninit(vnode) {
-    if (!vnode.attrs.modalId) throw new Error("Modal.attrs.modalId is required");
+    if (!vnode.attrs.modalId) {throw new Error("Modal.attrs.modalId is required");}
     // If modal is actually shown with all animations
     vnode.state.show = false;
   },
@@ -87,7 +76,7 @@ const _Modal = {
     vnode.dom.classList.remove("show");
     closeModal(vnode.attrs.modalId);
 
-    return new Promise(function(resolve) {
+    return new Promise((resolve) => {
       // Remove element from dom only after transition is finished
       vnode.dom.addEventListener("transitionend", resolve)
     })
@@ -120,6 +109,17 @@ const _Modal = {
           ])
         )
       )
+    )
+  }
+};
+
+// Modal wrapper
+const Modal = {
+  view(vnode) {
+    if (!activeModals.has(vnode.attrs.modalId)) {return null;}
+
+    return (
+      m(_Modal, vnode.attrs, vnode.children)
     )
   }
 };

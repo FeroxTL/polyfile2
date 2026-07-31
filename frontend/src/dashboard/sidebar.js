@@ -1,6 +1,6 @@
-import m from "mithril";
-import { NavLink } from "./components";
 import CreateDirectoryModalComponent from "./modals/create_directory_modal";
+import { NavLink } from "./components";
+import m from "mithril";
 import { showModal } from "./bootstrap/modal";
 import { uploadFile } from "./modals/uploader";
 
@@ -19,7 +19,7 @@ const DashboardSideBar = {
 
         // Navigation Links
         m("ul.nav nav-pills flex-column mb-auto", (vnode.attrs.items || []).map((item) => (
-          m("li.nav-item", { key: item.id }, m(NavLink, {isActive: vnode.attrs.activeId == item.id, href: item.url }, item.name))
+          m("li.nav-item", { key: item.id }, m(NavLink, { href: item.url, isActive: vnode.attrs.activeId === item.id }, item.name))
         ))),
 
         // Upload and Create Buttons
