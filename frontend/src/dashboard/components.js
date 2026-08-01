@@ -15,4 +15,4 @@ const NavLink = {
   }
 };
 
-export {NavLink};
+export { NavLink };

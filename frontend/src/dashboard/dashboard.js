@@ -2,11 +2,12 @@
 import m from "mithril";
 import DashboardSideBar from "./sidebar";
 import DashboardNavBar from "./navbar";
-import { API_V1_FSNODE, DASHBOARD_ROOT_URL } from "./urls";
+import { API_V1_FSNODE, DEFAULT_ROOT_URL, FILES_DASHBOARD_URL } from "./urls";
 import { ModalBackdrop, showModal } from "./bootstrap/modal";
 import CreateDirectoryModalComponent from "./modals/create_directory_modal";
 import RemoveFsNodeModalComponent from "./modals/remove_fsnode_modal";
 import { uploadFile } from "./modals/uploader";
+import Card from "./bootstrap/card";
 
 
 const XHR_READY_STATE_DONE = 4;
@@ -203,7 +204,7 @@ const FsNodeListComponent = {
 
   navigate(fsNode, event) {
     if (fsNode.type !== "file") {
-      m.route.set(DASHBOARD_ROOT_URL, {key: encodeURIComponent(`${FsNodeList.current.path  }/${  fsNode.name}`).replaceAll("%2F", "/")});
+      m.route.set(FILES_DASHBOARD_URL, {key: encodeURIComponent(`${FsNodeList.current.path  }/${  fsNode.name}`).replaceAll("%2F", "/")});
     };
     event.preventDefault();
     return false;
@@ -218,17 +219,12 @@ const FsNodeListComponent = {
         errorMessage = FsNodeList.error.response.detail;
       }
 
-      return (
-        m(".card w-50 align-self-center mt-5 bg-warning", [
-          m(".card-header", "Error"),
-          m(".card-body", [
-            m("p.card-text", errorMessage),
-            (FsNodeList.error.code === 0) &&
-              m("a", {href: "#", class: "btn btn-primary me-2", onclick: () => window.location.reload()}, "Refresh page") ||
-              m(m.route.Link, {href: "/disk/", class: "btn btn-primary me-2"}, "Main page"),
-          ])
-        ])
-      )
+      return m(Card, { class: "w-50 align-self-center mt-5 bg-warning" }, [
+        m("p.card-text", errorMessage),
+        (FsNodeList.error.code === 0) &&
+          m("a", { href: "#", class: "btn btn-primary me-2", onclick: () => window.location.reload() }, "Refresh page") ||
+          m(m.route.Link, { href: DEFAULT_ROOT_URL, class: "btn btn-primary me-2" }, "Main page"),
+      ]);
     }
 
     if (FsNodeList.xhr !== null && FsNodeList.xhr.readyState !== XHR_READY_STATE_DONE) {
@@ -274,7 +270,7 @@ const DashboardView = {
   oninit(vnode) {
     FsNodeList.load(vnode.attrs.key);
     // TODO: how to get? from url?
-    vnode.state.activeId = "files";
+    vnode.state.activeId = window.location.pathname.split("/")[1] || "files";
   },
 
   view(vnode) {

@@ -9,7 +9,7 @@ from polyfile.accounts.utils import get_sidebar_urls
 
 
 @login_required
-def dashboard_view(request: HttpRequest, path: str = '') -> HttpResponse:
+def files_dashboard_view(request: HttpRequest, path: str = '') -> HttpResponse:
     """Static page for SPA."""
     dashboard_urls = json.dumps(list(map(asdict, get_sidebar_urls(request.user))))
 

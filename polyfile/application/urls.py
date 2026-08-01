@@ -3,7 +3,7 @@ from django.urls import path, include, reverse_lazy
 from django.views.generic import RedirectView
 
 from polyfile.accounts.views import CustomLoginView
-from polyfile.application.views import dashboard_view
+from polyfile.application.views import files_dashboard_view
 from polyfile.storage.views import download_file_view, upload_file_view
 
 urlpatterns = [
@@ -14,7 +14,7 @@ urlpatterns = [
     path('download/<uuid:pk>/<token>/', download_file_view, name='download_file'),
     path('upload/<token>/', upload_file_view, name='upload_file'),
 
-    path('', RedirectView.as_view(url=reverse_lazy('disk_dashboard', kwargs={'path': '/'})), name='index'),
+    path('', RedirectView.as_view(url=reverse_lazy('files_dashboard', kwargs={'path': '/'})), name='index'),
     path('accounts/login/', CustomLoginView.as_view(), name='accounts-login'),
-    path('disk<path:path>', dashboard_view, name='disk_dashboard'),
+    path('files<path:path>', files_dashboard_view, name='files_dashboard'),
 ]
