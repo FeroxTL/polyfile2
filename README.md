@@ -49,6 +49,8 @@ and integrates seamlessly with Django’s built-in authentication system.
     - [ ] Ban by ip address for incorrect password
     - [ ] Password reset
     - [ ] Logout from SPA
+  - Admin
+    - [x] Storage settings with forms
 
 
 - x.x (Just plans, not exact version)
@@ -85,8 +87,6 @@ and integrates seamlessly with Django’s built-in authentication system.
     - Support more storages (like `s3`, see `django-storages`)
     - New type: Proxy storage (`fsnode` not created, all info about structure retrieves from storage itself)
     - Search for files or content
-  - Admin
-    - Storage settings with forms (can be added in api too)
   - Plugin system
   - Native application
     - Sync application for computers

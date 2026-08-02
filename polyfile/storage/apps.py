@@ -7,6 +7,6 @@ from polyfile.storage.handler import register_backend
 class StorageConfig(AppConfig):
     name = "polyfile.storage"
 
-    def ready(self) -> None:  # noqa
+    def ready(self) -> None:
         import polyfile.storage.signals # noqa
         register_backend(LocalDiskBackend)

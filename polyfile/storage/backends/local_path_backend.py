@@ -1,11 +1,15 @@
 import hashlib
 import io
 
-from django import http, forms
+from django import forms, http
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
-from django.core.files.uploadedfile import UploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
+from django.core.files.uploadedfile import (
+    InMemoryUploadedFile,
+    TemporaryUploadedFile,
+    UploadedFile,
+)
 from django.db import models
 from django.http import HttpRequest
 from django.http.multipartparser import MultiPartParserError
@@ -22,7 +26,7 @@ class RawFileParser:
         # Content-Type should not contain multipart and the boundary information.
         content_type = request.META.get("CONTENT_TYPE", "")
         if content_type.startswith("multipart/"):
-            raise MultiPartParserError("Invalid Content-Type: %s" % content_type)
+            raise MultiPartParserError(f"Invalid Content-Type: {content_type}")
 
         # Content-Length should contain the length of the body we are about
         # to receive.
@@ -33,12 +37,12 @@ class RawFileParser:
 
         if content_length < 0:
             # This means we shouldn't continue...raise an error.
-            raise MultiPartParserError("Invalid content length: %r" % content_length)
+            raise MultiPartParserError(f"Invalid content length: {content_length}")
 
         self._encoding = settings.DEFAULT_CHARSET
         self._content_length = content_length
         self._input_data = request
-        self._chunk_size = min(map(lambda x: x.chunk_size, request.upload_handlers))
+        self._chunk_size = min(x.chunk_size for x in request.upload_handlers)
         self._upload_handlers = request.upload_handlers
         self._meta = request.META
 
@@ -66,7 +70,7 @@ class LocalDiskBackend(FileSystemStorage, BaseStorageBackend):
     """Stores files in a directory on the local device."""
     chunk_size = 64 * 2 ** 10  # The default chunk size is 64 KB.
 
-    def __init__(self, location: str = None, *args, **kwargs):
+    def __init__(self, location: str | None = None, *args, **kwargs):
         if not location:
             raise ValidationError({'location': 'This field is required!'})
         self.base_location = location

@@ -1,11 +1,12 @@
-from typing import Sequence, Any
+from collections.abc import Sequence
+from typing import Any
 
 from django.db import models
 from django.db.models.fields.files import FieldFile
 
+from polyfile.storage import models as fs_models
 from polyfile.storage.backends import BaseStorageBackend
 from polyfile.storage.handler import fs_storages
-from polyfile.storage import models as fs_models
 
 
 class FsStorageFieldFile(FieldFile):

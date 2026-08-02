@@ -1,11 +1,12 @@
 import logging
-from typing import Type
 
 from django.apps.registry import apps
-from django.core.files.storage import StorageHandler, InvalidStorageError
+from django.core.files.storage import InvalidStorageError, StorageHandler
 from django.utils.functional import cached_property
 
 from polyfile.storage.backends import BaseStorageBackend
+
+logger = logging.getLogger(__name__)
 
 
 def _get_backend_options() -> dict[str, dict]:
@@ -38,7 +39,7 @@ class FsStorageHandler(StorageHandler):
         self.__dict__.pop("backends", None)
 
 
-def register_backend(storage_cls: Type[BaseStorageBackend], name: str = "") -> None:
+def register_backend(storage_cls: type[BaseStorageBackend], name: str = "") -> None:
     """Register storage backend."""
     if not issubclass(storage_cls, BaseStorageBackend):
         raise InvalidStorageError(f"Invalid backend class {storage_cls!r}: must subclass BaseStorageBackend")
@@ -46,10 +47,10 @@ def register_backend(storage_cls: Type[BaseStorageBackend], name: str = "") -> N
     backend = f"{storage_cls.__module__}.{storage_cls.__name__}"
 
     if backend in registered_backends:
-        logging.warning(f"Backend {backend!r} is already registered")
+        logger.warning(f"Backend {backend!r} is already registered")
 
     registered_backends[backend] = storage_cls
 
 
 fs_storages = FsStorageHandler()
-registered_backends: dict[str, Type[BaseStorageBackend]] = {}
+registered_backends: dict[str, type[BaseStorageBackend]] = {}

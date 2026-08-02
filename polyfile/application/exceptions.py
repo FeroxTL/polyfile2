@@ -2,6 +2,7 @@ import typing
 
 from django.utils.translation import gettext as _
 
+
 class HttpException(Exception):
     """Base HTTP exception."""
     status_code: int = 500

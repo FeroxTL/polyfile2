@@ -1,6 +1,7 @@
 import typing
 from pathlib import PurePosixPath
 
+import marshmallow.types
 from marshmallow import Schema, fields
 
 from polyfile.storage.models import FsNode, FsNodeTypeChoices
@@ -19,7 +20,7 @@ class PathField(fields.Field[str]):
     "/foo/bar/" -> "/foo/bar"
     "/foo/bar.jpg" -> "/foo/bar.jpg"
     """
-    default_error_messages: dict[str, str] = {
+    default_error_messages: marshmallow.types.ErrorMessages = {
         'invalid_utf8': 'Not a valid utf-8 string.',
     }
 

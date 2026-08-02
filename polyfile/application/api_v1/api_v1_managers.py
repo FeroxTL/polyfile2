@@ -32,7 +32,7 @@ def get_fs_node_with_children(user: User, path: PurePosixPath) -> FsNodeWithChil
         fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=path)
     except FsNode.DoesNotExist:
         raise api_v1_exceptions.FsNodeNotFoundError(
-            detail='Can not access "%s" - no such file or directory' % path,
+            detail=f'Can not access "{path}" - no such file or directory',
         )
 
     if fs_node is None:
@@ -102,9 +102,9 @@ def create_fs_node(
         try:
             parent_fs_node = get_user_fs_node_by_path(user=user, path=parent_path)
         except FsNode.DoesNotExist:
-            raise api_v1_exceptions.FsNodeIsNotADirectoryError(detail='Directory "%s" does not exist' % parent_path)
+            raise api_v1_exceptions.FsNodeIsNotADirectoryError(detail=f'Directory "{parent_path}" does not exist')
         if not parent_fs_node.is_directory:
-            raise api_v1_exceptions.FsNodeIsNotADirectoryError(detail='"%s" is not a directory' % parent_path)
+            raise api_v1_exceptions.FsNodeIsNotADirectoryError(detail=f'"{parent_path}" is not a directory')
 
     fs_node, created = base_qs.get_or_create(
         name=path.name,
@@ -137,7 +137,7 @@ def remove_fs_node(user: User, path: pathlib.PurePosixPath) -> None:
             raise FsNode.DoesNotExist
     except FsNode.DoesNotExist:
         raise api_v1_exceptions.FsNodeNotFoundError(
-            detail='Can not access "%s" - no such file or directory' % path,
+            detail=f'Can not access "{path}" - no such file or directory',
         )
 
     if fs_node.is_file:

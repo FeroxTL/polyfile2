@@ -16,3 +16,11 @@ dependencies = [
 
 [tool.ruff]
 exclude = ["migrations"]
+lint.ignore = [
+    "RUF012",  # mutable-class-default
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.1",
+]

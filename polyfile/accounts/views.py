@@ -1,7 +1,7 @@
 from django.contrib.auth.views import LoginView
 from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
 from django.utils.translation import gettext as _
+from django.views.decorators.cache import cache_page
 
 from polyfile.accounts.forms import CustomAuthenticationForm
 

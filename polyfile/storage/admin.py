@@ -1,21 +1,21 @@
-from typing import Sequence
+from collections.abc import Sequence
+from typing import ClassVar
 
+from django import forms
 from django.contrib import admin
 from django.core import exceptions
 from django.core.files.storage import InvalidStorageError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import models
-from django.forms import ModelForm, ALL_FIELDS
+from django.forms import ALL_FIELDS, ModelForm
 from django.forms.widgets import Widget
 from django.http import HttpRequest
 from django.utils.translation import gettext as _
 
 from polyfile.storage.handler import fs_storages, registered_backends
-from polyfile.storage.models import Storage, FsNode, TempUpload
+from polyfile.storage.models import FsNode, Storage, TempUpload
 from polyfile.storage.utils import get_md5_sum, get_mime_type
 
-
-from django import forms
 
 class OptionsWidget(forms.MultiWidget):
     widgets: dict
@@ -72,7 +72,7 @@ class StorageAdminForm(ModelForm):
     class Meta:
         model = Storage
         fields = ALL_FIELDS
-        help_texts = {
+        help_texts: ClassVar = {
             'backend': 'Options depends on this field',
         }
 
@@ -103,8 +103,6 @@ class StorageAdminForm(ModelForm):
                 })
             except InvalidStorageError as e:
                 raise exceptions.ValidationError({"backend": str(e)})
-            except Exception as e:
-                raise exceptions.ValidationError({"options": str(e)})
 
         return super().clean()
 

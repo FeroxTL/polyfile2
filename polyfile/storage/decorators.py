@@ -1,7 +1,7 @@
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable
 
-from django.http import JsonResponse, Http404
+from django.http import Http404, JsonResponse
 
 from polyfile.application.exceptions import HttpException, NotFound
 
