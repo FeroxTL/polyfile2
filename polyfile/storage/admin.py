@@ -68,6 +68,7 @@ class OptionsField(forms.MultiValueField):
             )
         return {}
 
+
 class StorageAdminForm(ModelForm):
     class Meta:
         model = Storage
@@ -130,10 +131,10 @@ class FsNodeAdminForm(ModelForm):
 @admin.register(FsNode)
 class FsNodeAdmin(admin.ModelAdmin):
     ordering = ("name",)
-    list_display = ("id", "type", "name", "storage_id", "display_file_name")
+    list_display = ("id", "type", "name", "storage_id", "display_file_name", "created_at")
     list_filter = ("storage", "type")
     raw_id_fields = ("storage", "owner", "parent")
-    readonly_fields = ("size", "mime_type", "md5")
+    readonly_fields = ("size", "mime_type", "md5", "created_at", "modified_at")
     form = FsNodeAdminForm
 
     @admin.display(description=_("File name"))
@@ -144,7 +145,7 @@ class FsNodeAdmin(admin.ModelAdmin):
         if obj is None:
             return self.readonly_fields
         else:
-            return ("owner", "storage", "type") + self.readonly_fields
+            return ("id", "owner", "storage", "type") + self.readonly_fields
 
 
 @admin.register(TempUpload)

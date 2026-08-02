@@ -1,15 +1,10 @@
 import hashlib
-import io
 
 from django import forms, http
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
-from django.core.files.uploadedfile import (
-    InMemoryUploadedFile,
-    TemporaryUploadedFile,
-    UploadedFile,
-)
 from django.db import models
 from django.http import HttpRequest
 from django.http.multipartparser import MultiPartParserError
@@ -46,24 +41,8 @@ class RawFileParser:
         self._upload_handlers = request.upload_handlers
         self._meta = request.META
 
-    def get_file_obj(self, name: str) -> UploadedFile:
-        if self._content_length <= settings.FILE_UPLOAD_MAX_MEMORY_SIZE:
-            return InMemoryUploadedFile(
-                file=io.BytesIO(),
-                field_name=None,
-                name=name,
-                content_type=None,
-                size=None,
-                charset=None,
-                content_type_extra=None,
-            )
-        return TemporaryUploadedFile(
-            name=name,
-            content_type=None,
-            size=None,
-            charset=None,
-            content_type_extra=None,
-        )
+    def read(self, chunk_size: int) -> bytes | None:
+        return self._input_data.read(chunk_size)
 
 
 class LocalDiskBackend(FileSystemStorage, BaseStorageBackend):
@@ -93,20 +72,26 @@ class LocalDiskBackend(FileSystemStorage, BaseStorageBackend):
         })
 
     def save_file(self, fs_node: models.Model, request: HttpRequest) -> None:
+        """Save request into file."""
+        # Create empty file
+        fs_node.file.save(fs_node.name, ContentFile(''), save=False)
+        fs_node.save(update_fields=('file',))
+
+        # File content is in request.body
         parser = RawFileParser(request=request)
-        file_obj = parser.get_file_obj(name=fs_node.name)
 
         file_size = 0
         hash_md5 = hashlib.md5()
-        while chunk := request.read(self.chunk_size):
-            chunk_length = len(chunk)
-            hash_md5.update(chunk)
-            file_obj.write(chunk)
-            file_size += chunk_length
+        with fs_node.file.open('wb') as file_obj:
+            while chunk := parser.read(self.chunk_size):
+                file_obj.write(chunk)
+                hash_md5.update(chunk)
+                file_size += len(chunk)
 
-        fs_node.file = file_obj
-        fs_node.size = file_obj.size = file_size
+        fs_node.size = file_size
         fs_node.md5 = hash_md5.hexdigest()
-        fs_node.mime_type = get_mime_type(fs_node.file)
-        fs_node.save()
-        file_obj.close()
+
+        with fs_node.file.open('rb') as file_obj:
+            fs_node.mime_type = get_mime_type(file_obj)
+
+        fs_node.save(update_fields=('size', 'md5', 'mime_type'))
