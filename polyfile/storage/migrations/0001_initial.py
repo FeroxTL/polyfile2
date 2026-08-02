@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=32, verbose_name='Name')),
-                ('backend', models.CharField(choices=polyfile.storage.models.get_backend_list, max_length=255, verbose_name='Backend')),
+                ('backend', models.CharField(choices=polyfile.storage.models.get_backend_choices, max_length=255, verbose_name='Backend')),
                 ('options', models.JSONField(blank=True, default=dict, verbose_name='Options')),
             ],
         ),

@@ -12,8 +12,11 @@ from polyfile.storage import model_fields
 from polyfile.storage.handler import registered_backends
 
 
-def get_backend_list() -> dict[str, str]:
-    return registered_backends
+def get_backend_choices() -> dict[str, str]:
+    return {
+        key: cls.name or cls.__name__
+        for key, cls in registered_backends.items()
+    }
 
 
 class Storage(models.Model):
@@ -25,7 +28,7 @@ class Storage(models.Model):
     backend: str = models.CharField(
         max_length=255,
         verbose_name="Backend",
-        choices=get_backend_list,
+        choices=get_backend_choices,
     )
     options: dict = models.JSONField(
         default=dict,
@@ -76,7 +79,7 @@ class AbstractFsNode(models.Model):
     class Meta:
         abstract = True
 
-    DoesNotExist: typing.Type[models.ObjectDoesNotExist]
+    DoesNotExist: type[models.ObjectDoesNotExist]
     storage_id: str | None
     owner_id: int | None
     _path: str | None
@@ -153,9 +156,9 @@ class FsNode(AbstractFsNode):
     class Meta:
         verbose_name = "Node"
         verbose_name_plural = "Nodes"
-        unique_together = [
+        unique_together: typing.ClassVar = (
             ("name", "parent", "storage"),
-        ]
+        )
 
     get_type_display: typing.Callable
     objects = models.Manager()

@@ -12,3 +12,7 @@ dependencies = [
     "marshmallow==4.3.0",
     "python-magic>=0.4.27",
 ]
+
+
+[tool.ruff]
+exclude = ["migrations"]

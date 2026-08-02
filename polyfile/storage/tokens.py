@@ -1,8 +1,9 @@
-from datetime import datetime
+import datetime
 
 from django.conf import settings
 from django.utils.crypto import constant_time_compare, salted_hmac
 from django.utils.http import base36_to_int, int_to_base36
+from django.utils import timezone
 
 
 class FileDownloadTokenGenerator:
@@ -64,10 +65,7 @@ class FileDownloadTokenGenerator:
             return False
 
         # Check the timestamp is within limit.
-        if (self._num_seconds(self._now()) - ts) > self.timeout_sec:
-            return False
-
-        return True
+        return (self._num_seconds(self._now()) - ts) <= self.timeout_sec
 
     def _make_token_with_timestamp(self, fs_node, timestamp: int, secret: str):
         # timestamp is number of seconds since 2001-1-1. Converted to base 36,
@@ -81,7 +79,7 @@ class FileDownloadTokenGenerator:
         ).hexdigest()[
             ::2
         ]  # Limit to shorten the URL.
-        return '%s-%s' % (ts_b36, hash_string)
+        return f'{ts_b36}-{hash_string}'
 
     @staticmethod
     def _make_hash_value(fs_node, timestamp: int):
@@ -94,13 +92,13 @@ class FileDownloadTokenGenerator:
         return f'{fs_node.id}{fs_node.storage_id}{timestamp}{fs_node.md5}'
 
     @staticmethod
-    def _num_seconds(dt: datetime) -> int:
-        return int((dt - datetime(2001, 1, 1)).total_seconds())
+    def _num_seconds(dt: datetime.datetime) -> int:
+        return int((dt - datetime.datetime(2001, 1, 1, tzinfo=datetime.UTC)).total_seconds())
 
     @staticmethod
-    def _now() -> datetime:
-        # Used for mocking in tests
-        return datetime.now()
+    def _now() -> datetime.datetime:
+        # Used for mocking in tests TODO: check
+        return timezone.now()
 
 
 default_token_generator = FileDownloadTokenGenerator()

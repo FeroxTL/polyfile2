@@ -1,9 +1,10 @@
 import hashlib
 import io
 
-from django import http
+from django import http, forms
 from django.conf import settings
-from django.contrib.staticfiles.storage import StaticFilesStorage
+from django.core.exceptions import ValidationError
+from django.core.files.storage import FileSystemStorage
 from django.core.files.uploadedfile import UploadedFile, TemporaryUploadedFile, InMemoryUploadedFile
 from django.db import models
 from django.http import HttpRequest
@@ -61,9 +62,25 @@ class RawFileParser:
         )
 
 
-class LocalDiskBackend(StaticFilesStorage, BaseStorageBackend):
+class LocalDiskBackend(FileSystemStorage, BaseStorageBackend):
     """Stores files in a directory on the local device."""
     chunk_size = 64 * 2 ** 10  # The default chunk size is 64 KB.
+
+    def __init__(self, location: str = None, *args, **kwargs):
+        if not location:
+            raise ValidationError({'location': 'This field is required!'})
+        self.base_location = location
+        super().__init__(*args, **kwargs)
+
+    @classmethod
+    def get_option_fields(cls) -> dict[str, forms.Field]:
+        return {
+            'location': forms.CharField(
+                required=True,
+                label='Location',
+                widget=forms.TextInput(attrs={'placeholder': 'Location'}),
+            ),
+        }
 
     def download_url(self, instance: models.Model):
         return reverse('download_file', kwargs={

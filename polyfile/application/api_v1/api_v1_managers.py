@@ -4,11 +4,10 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 import marshmallow
-from django import http
 from django.db import models
 
 from polyfile.accounts.models import User
-from polyfile.application.api_v1 import api_v1_schemas, api_v1_exceptions
+from polyfile.application.api_v1 import api_v1_exceptions
 from polyfile.application.api_v1.api_v1_schemas import get_fs_node_name_validator
 from polyfile.storage.managers import get_user_fs_node_by_path
 from polyfile.storage.models import FsNode, FsNodeTypeChoices

@@ -48,8 +48,8 @@ def register_backend(storage_cls: Type[BaseStorageBackend], name: str = "") -> N
     if backend in registered_backends:
         logging.warning(f"Backend {backend!r} is already registered")
 
-    registered_backends[backend] = name or storage_cls.__name__
+    registered_backends[backend] = storage_cls
 
 
 fs_storages = FsStorageHandler()
-registered_backends: dict[str, str] = {}
+registered_backends: dict[str, Type[BaseStorageBackend]] = {}

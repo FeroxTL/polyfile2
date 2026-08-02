@@ -1,34 +1,110 @@
+from typing import Sequence
+
 from django.contrib import admin
 from django.core import exceptions
 from django.core.files.storage import InvalidStorageError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import models
 from django.forms import ModelForm, ALL_FIELDS
+from django.forms.widgets import Widget
 from django.http import HttpRequest
 from django.utils.translation import gettext as _
 
-from polyfile.storage.handler import fs_storages
+from polyfile.storage.handler import fs_storages, registered_backends
 from polyfile.storage.models import Storage, FsNode, TempUpload
 from polyfile.storage.utils import get_md5_sum, get_mime_type
 
+
+from django import forms
+
+class OptionsWidget(forms.MultiWidget):
+    widgets: dict
+    widgets_names: list[str]
+
+    template_name = 'forms/widgets/labeled-multiwidget.html'
+
+    def __init__(self, widgets: dict[str, Widget], labels: Sequence[str], attrs=None):
+        self.labels = labels
+        super().__init__(widgets, attrs)
+
+    def decompress(self, value: dict):
+        # value: dict = json.loads(value)
+        return tuple(value.get(key.lstrip('_')) for key in self.widgets_names)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+
+        # Zip the generated subwidgets and custom labels together to inject them
+        for subwidget, label in zip(context['widget']['subwidgets'], self.labels):
+            subwidget['custom_label'] = label  # Assign new key into the subwidget context
+
+        return context
+
+
+class OptionsField(forms.MultiValueField):
+    def __init__(self, fields: dict[str, forms.Field], **kwargs):
+        self.subfields = fields
+
+        super().__init__(
+            fields=list(self.subfields.values()),
+            widget=OptionsWidget(
+                widgets={key: field.widget for key, field in self.subfields.items()},
+                labels=tuple(field.label or key.capitalize() for key, field in self.subfields.items()),
+            ),
+            **kwargs,
+        )
+
+    def compress(self, data_list: list):
+        """
+        Merges sub-widget clean inputs into a single object for the JSONField.
+        :param data_list: Validated data from each sub-field.
+        """
+        if data_list:
+            return dict(
+                zip(
+                    self.subfields.keys(),
+                    data_list,
+                )
+            )
+        return {}
 
 class StorageAdminForm(ModelForm):
     class Meta:
         model = Storage
         fields = ALL_FIELDS
+        help_texts = {
+            'backend': 'Options depends on this field',
+        }
+
+    def __init__(self, data=None, *args, **kwargs):
+        instance = kwargs.get('instance')
+        super().__init__(data, *args, **kwargs)
+        storage_backend = None
+        try:
+            if data is not None and 'backend' in data:
+                storage_backend = registered_backends[data['backend']]
+            elif instance is not None:
+                storage_backend = fs_storages[instance.pk]
+        except InvalidStorageError:
+            pass
+
+        if storage_backend is not None:
+            self.fields['options'] = OptionsField(
+                fields=storage_backend.get_option_fields(),
+            )
 
     def clean(self):
         """Validate fields."""
-        backend = self.cleaned_data.get("backend", "")
-        try:
-            fs_storages.create_storage({
-                "BACKEND": backend,
-                "OPTIONS": self.cleaned_data.get("options", {})
-            })
-        except InvalidStorageError as e:
-            raise exceptions.ValidationError({"backend": str(e)})
-        except Exception as e:
-            raise exceptions.ValidationError({"options": str(e)})
+        if not self.errors:
+            try:
+                fs_storages.create_storage({
+                    "BACKEND": self.cleaned_data.get("backend", ""),
+                    "OPTIONS": self.cleaned_data.get("options", {})
+                })
+            except InvalidStorageError as e:
+                raise exceptions.ValidationError({"backend": str(e)})
+            except Exception as e:
+                raise exceptions.ValidationError({"options": str(e)})
 
         return super().clean()
 
