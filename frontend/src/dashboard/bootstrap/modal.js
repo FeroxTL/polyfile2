@@ -10,41 +10,6 @@ function showModal(modalId) {
   activeModals.add(modalId);
 }
 
-const _ModalBackdrop = {
-  oninit(vnode) {
-    vnode.state.show = false;
-  },
-
-  oncreate(vnode) {
-    // Start fade in animation
-    return new Promise(resolve => {
-      vnode.state.show = true;
-      m.redraw();
-      resolve();
-    });
-  },
-
-  onbeforeremove(vnode) {
-    // Start fade out animation
-    vnode.dom.classList.remove("show");
-    vnode.state.show = false;
-
-    return new Promise((resolve) => {
-      vnode.dom.addEventListener("transitionend", resolve)
-    })
-  },
-
-  onremove() {
-    // Modal body was removed
-    m.redraw();
-  },
-
-  view(vnode) {
-    return (
-      m(".modal-backdrop fade", { class: vnode.state.show ? "show" : ""})
-    )
-  }
-};
 
 // Backdrop wrapper
 const ModalBackdrop = {
@@ -52,7 +17,24 @@ const ModalBackdrop = {
     if (activeModals.size === 0) {return null;}
 
     return (
-      m(_ModalBackdrop)
+      m(".modal-backdrop fade", {
+        oncreate: (vnode) => (
+          // Start fade in animation
+          new Promise(resolve => {
+            vnode.dom.classList.add("show");
+            m.redraw();
+            resolve();
+          })
+        ),
+
+        onbeforeremove: (vnode) => (
+          // Start fade out animation
+          new Promise((resolve) => {
+            vnode.dom.classList.remove("show");
+            vnode.dom.addEventListener("transitionend", resolve);
+          })
+        ),
+      })
     )
   }
 };
@@ -90,8 +72,8 @@ const _Modal = {
 
   view(vnode) {
     return (
-      m(".modal fade app-ignore-selection", {
-          class: vnode.state.show ? "show d-block" : "",
+      m(".modal fade app-ignore-selection d-block", {
+          class: vnode.state.show ? "show" : "",
           onclick: (e) => {
             // Click on backdrop, close modal
             if (e.target.classList.contains("modal")) {
@@ -116,7 +98,7 @@ const _Modal = {
 // Modal wrapper
 const Modal = {
   view(vnode) {
-    if (!activeModals.has(vnode.attrs.modalId)) {return null;}
+    if (!activeModals.has(vnode.attrs.modalId)) {return null};
 
     return (
       m(_Modal, vnode.attrs, vnode.children)

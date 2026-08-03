@@ -26,12 +26,14 @@ export default defineConfig([
       "no-magic-numbers": ["error", {
         "ignore": [-1, 0, 1],
       }],
-    "no-plusplus": "off",
-    // TODO: enable
-    "camelcase": "off",
-    // TODO: enable
-    "no-underscore-dangle": "off",
-    "func-style": "off",
+      "no-plusplus": "off",
+      // TODO: enable
+      "camelcase": "off",
+      // TODO: enable
+      "no-underscore-dangle": "off",
+      "func-style": "off",
+      "capitalized-comments": "warn",
+      "no-unused-vars": "warn",
     }
   },
   { files: ["**/*.css"], plugins: { css }, language: "css/css" },
