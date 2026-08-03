@@ -1,6 +1,7 @@
 import m from "mithril";
 
 const activeModals = new Set();
+let fullScreenModals = 0;
 
 function closeModal(modalId) {
   activeModals.delete(modalId);
@@ -10,22 +11,19 @@ function showModal(modalId) {
   activeModals.add(modalId);
 }
 
-
 // Backdrop wrapper
 const ModalBackdrop = {
   view() {
-    if (activeModals.size === 0) {return null;}
+    if (activeModals.size === 0 || fullScreenModals !== 0) {return null;}
 
     return (
       m(".modal-backdrop fade", {
-        oncreate: (vnode) => (
+        oncreate: (vnode) => {
+          // Trigger a reflow to ensure the initial state is painted
+          vnode.dom.offsetHeight;
           // Start fade in animation
-          new Promise(resolve => {
-            vnode.dom.classList.add("show");
-            m.redraw();
-            resolve();
-          })
-        ),
+          vnode.dom.classList.add("show");
+        },
 
         onbeforeremove: (vnode) => (
           // Start fade out animation
@@ -42,38 +40,40 @@ const ModalBackdrop = {
 // Main body of modal, separated for animations
 const _Modal = {
   oninit(vnode) {
+    if (!Object.hasOwn(vnode.attrs, "fade")) {
+      vnode.attrs.fade = true;
+    };
+    if (vnode.attrs.fullScreen) { fullScreenModals++ };
     if (!vnode.attrs.modalId) {throw new Error("Modal.attrs.modalId is required");}
-    // If modal is actually shown with all animations
-    vnode.state.show = false;
   },
 
   oncreate(vnode) {
+    // Trigger a reflow to ensure the initial state is painted
+    vnode.dom.offsetHeight;
     // Start fade in animation
-    vnode.dom.classList.add("d-block");
-    vnode.state.show = true;
+    vnode.dom.classList.add("show");
   },
 
   onbeforeremove(vnode) {
-    // Start fade out animation
-    vnode.dom.classList.remove("show");
     closeModal(vnode.attrs.modalId);
+    if (!vnode.attrs.fade) {return null};
 
     return new Promise((resolve) => {
+      // Start fade out animation
+      vnode.dom.classList.remove("show");
       // Remove element from dom only after transition is finished
       vnode.dom.addEventListener("transitionend", resolve)
     })
   },
 
   onremove(vnode) {
-    // Hiding modal animation
-    vnode.state.show = false;
-    m.redraw();
+    if (vnode.attrs.fullScreen) { fullScreenModals-- };
   },
 
   view(vnode) {
     return (
-      m(".modal fade app-ignore-selection d-block", {
-          class: vnode.state.show ? "show" : "",
+      m(".modal app-ignore-selection d-block", {
+          class: vnode.attrs.fade ? "fade" : "show",
           onclick: (e) => {
             // Click on backdrop, close modal
             if (e.target.classList.contains("modal")) {
@@ -81,7 +81,9 @@ const _Modal = {
             };
           }
         },
-        m(".modal-dialog",
+        m(".modal-dialog", {
+            class: vnode.attrs.fullScreen ? "modal-fullscreen" : "",
+          },
           m(".modal-content", [
             m(".modal-header", [
               m("h5", vnode.attrs.title),

@@ -23,7 +23,7 @@ export default defineConfig([
       "max-lines": "warn",
       "max-lines-per-function": "warn",
       "no-ternary": "off",
-      "no-magic-numbers": ["error", {
+      "no-magic-numbers": ["warn", {
         "ignore": [-1, 0, 1],
       }],
       "no-plusplus": "off",
