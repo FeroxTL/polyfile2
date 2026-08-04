@@ -39,7 +39,7 @@ class FsStorageHandler(StorageHandler):
         self.__dict__.pop("backends", None)
 
 
-def register_backend(storage_cls: type[BaseStorageBackend], name: str = "") -> None:
+def register_backend(storage_cls: type[BaseStorageBackend]) -> None:
     """Register storage backend."""
     if not issubclass(storage_cls, BaseStorageBackend):
         raise InvalidStorageError(f"Invalid backend class {storage_cls!r}: must subclass BaseStorageBackend")
