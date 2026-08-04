@@ -2,6 +2,7 @@ from dataclasses import asdict
 
 import marshmallow
 from django import http
+from django.contrib.auth import logout as dj_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -116,3 +117,18 @@ class DashboardContextView(BaseApiView):
         return http.JsonResponse({
             'sidebar_urls': list(map(asdict, get_sidebar_urls(request.user)))
         })
+
+
+class LogoutView(BaseApiView):
+    """Logout API endpoint - invalidates session tokens."""
+
+    @staticmethod
+    def post(request: RequestType) -> http.HttpResponse:
+        """Logout and invalidate session."""
+        assert request.user.is_authenticated and isinstance(request.user, User)
+        dj_logout(request)
+
+        return http.JsonResponse(
+            status=204,
+            data={'message': 'Logged out successfully'}
+        )

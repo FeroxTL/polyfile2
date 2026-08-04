@@ -116,7 +116,7 @@ const FsNodeEmptyDirectoryComponent = {
   view() {
     return (
       m(".row",
-        m(".col-md-10 offset-md-1 col-lg-8 .offset-lg-2",
+        m(".col-lg-8 .offset-lg-2",
           m(".card text-center mt-2", [
             m("p.card-header bg-primary", "This directory is empty"),
             m(".card-body border border-primary p-4", [

@@ -48,7 +48,7 @@ and integrates seamlessly with Django’s built-in authentication system.
   - User authentication
     - [ ] Ban by ip address for incorrect password
     - [ ] Password reset
-    - [ ] Logout from SPA
+    - [x] Logout from SPA
   - Admin
     - [x] Storage settings with forms
 

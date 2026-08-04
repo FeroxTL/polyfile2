@@ -51,7 +51,6 @@ const Collapse = {
   }
 };
 
-
 // Navbar on the top - only for mobile (xs) devices
 const DashboardNavBar = {
   oninit(vnode) {
@@ -69,7 +68,7 @@ const DashboardNavBar = {
           m("ul.navbar-nav me-auto mb-2 mb-lg-0", [
             (vnode.attrs.items || []).map((item) => (
               m("li.nav-item", { key: item.id }, m(NavLink, {
-                isActive: vnode.attrs.activeId === item.id,
+                class: vnode.attrs.activeId === item.id ? "active" : "",
                 href: item.url,
               }, item.name))
             ))
