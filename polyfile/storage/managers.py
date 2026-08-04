@@ -1,5 +1,5 @@
 from functools import partial
-from pathlib import PurePath
+from pathlib import PurePosixPath
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import models
@@ -30,13 +30,13 @@ def make_fs_node_cte(cte: CTE, base_queryset: models.QuerySet):
     )
 
 
-def get_user_fs_node_by_path(user: AbstractBaseUser, path: PurePath) -> FsNode | None:
+def get_user_fs_node_by_path(user: AbstractBaseUser, path: PurePosixPath) -> FsNode | None:
     """
     Get FsNode with owner=user and path=path.
 
     :raises FsNode.DoesNotExist: If FsNode with specified path does not exist.
     """
-    if path != PurePath('/'):
+    if path != PurePosixPath('/'):
         cte = CTE.recursive(partial(make_fs_node_cte, base_queryset=FsNode.objects.filter(owner=user)))
         return with_cte(
             cte,
