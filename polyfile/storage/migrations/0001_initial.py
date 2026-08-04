@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('file', polyfile.storage.model_fields.FsStorageFileField(blank=True, verbose_name='File')),
                 ('mime_type', models.CharField(blank=True, editable=False, max_length=256, verbose_name='Mimetype')),
-                ('md5', models.CharField(blank=True, editable=False, max_length=16, verbose_name='md5')),
+                ('md5', models.CharField(blank=True, editable=False, max_length=32, verbose_name='md5')),
                 ('modified_at', models.DateTimeField(auto_now=True, verbose_name='Date update')),
                 ('id', models.UUIDField(blank=True, db_index=True, default=uuid.uuid4, primary_key=True, serialize=False)),
                 ('name', models.CharField(db_index=True, max_length=255, verbose_name='Name')),

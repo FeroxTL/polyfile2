@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
+from django_hint import RequestType
 
 from polyfile.accounts.models import User
 from polyfile.accounts.utils import get_sidebar_urls
@@ -38,7 +39,7 @@ class BaseApiView(LoginRequiredMixin, View):
 
 class FsNodeListApiView(BaseApiView):
     @staticmethod
-    def get(request: http.HttpRequest) -> http.HttpResponse:
+    def get(request: RequestType) -> http.HttpResponse:
         """Retrieve FsNode (file/directory) by path and its children (if any)."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
@@ -51,7 +52,7 @@ class FsNodeListApiView(BaseApiView):
         return http.JsonResponse(data=api_v1_schemas.FsNodeListResponseSchema().dump(fs_node_with_children))
 
     @staticmethod
-    def delete(request: http.HttpRequest) -> http.HttpResponse:
+    def delete(request: RequestType) -> http.HttpResponse:
         """Remove FsNode."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
@@ -66,7 +67,7 @@ class FsNodeListApiView(BaseApiView):
 
 class FsNodeMkdirApiView(BaseApiView):
     @staticmethod
-    def post(request: http.HttpRequest) -> http.HttpResponse:
+    def post(request: RequestType) -> http.HttpResponse:
         """Create FsNode(type=directory)."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
@@ -86,7 +87,7 @@ class FsNodeMkdirApiView(BaseApiView):
 
 class FsNodeTouchApiView(BaseApiView):
     @staticmethod
-    def post(request: http.HttpRequest) -> http.HttpResponse:
+    def post(request: RequestType) -> http.HttpResponse:
         """Create FsNode(type=file)."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
@@ -111,7 +112,7 @@ class FsNodeTouchApiView(BaseApiView):
 
 class DashboardContextView(BaseApiView):
     @staticmethod
-    def get(request: http.HttpRequest) -> http.HttpResponse:
+    def get(request: RequestType) -> http.HttpResponse:
         return http.JsonResponse({
             'sidebar_urls': list(map(asdict, get_sidebar_urls(request.user)))
         })

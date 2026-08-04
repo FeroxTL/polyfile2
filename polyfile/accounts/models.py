@@ -1,9 +1,9 @@
 from django.contrib.auth.models import AbstractUser
-from django.contrib.auth.models import UserManager as DjangoUserManager
 from django.db import models
+from django_hint import StandardModelType
 
 
-class User(AbstractUser):
+class User(AbstractUser, StandardModelType['User']):
     """User model."""
     storage = models.ForeignKey(
         'storage.Storage',
@@ -13,7 +13,6 @@ class User(AbstractUser):
         on_delete=models.SET_NULL,
     )
 
-    objects = DjangoUserManager()
     storage_id: str | None
 
     @property
