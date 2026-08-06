@@ -9,10 +9,6 @@ import RemoveFsNodeModalComponent from "./modals/remove_fsnode_modal";
 import { uploadFile } from "./modals/uploader";
 import Card from "./bootstrap/card";
 
-
-const XHR_READY_STATE_DONE = 4;
-
-
 // FsNode model
 function FsNode(data) {
   this.name = data.name || "";
@@ -26,7 +22,7 @@ function FsNode(data) {
   this.path = data.path || "";
   this.download_url = data.download_url || "";
   this.selected = false;
-};
+}
 
 /**
   Available sorters.
@@ -38,7 +34,6 @@ const Sorters = {
     return a.name.localeCompare(b.name);
   },
 };
-
 
 // File list data
 const FsNodeList = {
@@ -83,11 +78,11 @@ const FsNodeList = {
     const sorter = Sorters[this.current.sorting || "default"];
     for (let i = 0; i < this.elements.length; i++) {
       if (sorter(this.elements[i], fsNode) > 0) {
-        this.elements.splice(i, 0, fsNode);
-        return;
+        return this.elements.splice(i, 0, fsNode);
       }
-    };
+    }
     this.elements.push(fsNode);
+    return this.elements;
   },
 };
 
@@ -205,12 +200,14 @@ const FsNodeListComponent = {
   navigate(fsNode, event) {
     if (fsNode.type !== "file") {
       m.route.set(FILES_DASHBOARD_URL, {key: encodeURIComponent(`${FsNodeList.current.path  }/${  fsNode.name}`).replaceAll("%2F", "/")});
-    };
+    }
     event.preventDefault();
     return false;
   },
 
   view() {
+    const XHR_READY_STATE_DONE = 4;
+
     if (FsNodeList.error !== null) {
       let errorMessage = FsNodeList.error.message;
       if (FsNodeList.error.code === 0) {
@@ -233,7 +230,7 @@ const FsNodeListComponent = {
         // TODO: Add loading placeholders https://getbootstrap.com/docs/5.2/components/placeholders/
         m("p", "Loading.."),
       ])
-    };
+    }
 
     return (
       m("div.flex-grow-1 my-md-2 my-1", [
@@ -269,7 +266,6 @@ const FsNodeListComponent = {
 const DashboardView = {
   oninit(vnode) {
     FsNodeList.load(vnode.attrs.key);
-    // TODO: how to get? from url?
     vnode.state.activeId = window.location.pathname.split("/")[1] || "files";
   },
 

@@ -1,5 +1,6 @@
 import CreateDirectoryModalComponent from "./modals/create_directory_modal";
-import { NavLink } from "./components";
+import { NavLink } from "./bootstrap/navlink";
+import Collapse from "./bootstrap/collapse";
 import m from "mithril";
 import { showModal } from "./bootstrap/modal";
 import { uploadFile } from "./modals/uploader";
@@ -23,9 +24,10 @@ const SidebarProfileAccordion = {
               onclick: () => { vnode.state.show = !vnode.state.show }
             }, "User account")
           ),
-          // TODO: class collapsing (animation)
-          m("#profileAccordion.accordion-collapse collapse", {
-              class: vnode.state.show ? "show" : "",
+          m(Collapse, {
+              collapsed: !vnode.state.show,
+              id: "profileAccordion",
+              class: "accordion-collapse",
             }, m("div", [
               m("ul.list-group list-group-flush", [
                 m("li.list-group-item", m(Button, {
