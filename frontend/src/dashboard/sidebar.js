@@ -22,7 +22,7 @@ const SidebarProfileAccordion = {
             }, m("button.accordion-button[type=button][aria-controls=profileAccordion]", {
               class: vnode.state.show ? "" : "collapsed",
               onclick: () => { vnode.state.show = !vnode.state.show }
-            }, "User account")
+            }, "Account")
           ),
           m(Collapse, {
               collapsed: !vnode.state.show,

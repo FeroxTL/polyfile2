@@ -23,5 +23,6 @@ lint.ignore = [
 
 [dependency-groups]
 dev = [
+    "django-debug-toolbar>=7.0.0",
     "ruff>=0.16.1",
 ]

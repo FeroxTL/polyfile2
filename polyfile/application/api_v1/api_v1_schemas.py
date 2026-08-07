@@ -2,7 +2,7 @@ import typing
 from pathlib import PurePosixPath
 
 import marshmallow.types
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 
 from polyfile.storage.models import FsNode, FsNodeTypeChoices
 
@@ -99,9 +99,9 @@ def get_fs_node_name_validator() -> fields.validate.Validator:
     """Validate FsNode.name."""
     # TODO: add validation for control characters
     # TODO: add OS compatibility settings (maybe user.compat_devices)
-    return fields.validate.And(
-        fields.validate.Length(min=1, error='Directory name is empty'),
-        fields.validate.NoneOf(('..', '.'), error='Directory name can not be "." or ".."'),
+    return validate.And(
+        validate.Length(min=1, error='Directory name is empty'),
+        validate.NoneOf(('..', '.'), error='Directory name can not be "." or ".."'),
     )
 
 

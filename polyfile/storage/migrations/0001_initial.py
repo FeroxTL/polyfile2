@@ -25,6 +25,7 @@ class Migration(migrations.Migration):
                 ('backend', models.CharField(choices=polyfile.storage.models.get_backend_choices, max_length=255, verbose_name='Backend')),
                 ('options', models.JSONField(blank=True, default=dict, verbose_name='Options')),
             ],
+            options={'verbose_name': 'Storage', 'verbose_name_plural': 'Storages'},
         ),
         migrations.CreateModel(
             name='FsNode',

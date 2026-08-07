@@ -16,7 +16,7 @@ from django.views.static import was_modified_since
 
 from polyfile.application.api_v1 import api_v1_schemas
 from polyfile.application.exceptions import NotFound, PermissionDenied
-from polyfile.storage.backends import BaseStorageBackend
+from polyfile.backends.base import BaseStorageBackend
 from polyfile.storage.decorators import catch_storage_exceptions
 from polyfile.storage.models import ChunkedStatus, FsNode, FsNodeTypeChoices, TempUpload
 from polyfile.storage.tokens import default_token_generator

@@ -4,8 +4,8 @@ from typing import Any
 from django.db import models
 from django.db.models.fields.files import FieldFile
 
+from polyfile.backends.base import BaseStorageBackend
 from polyfile.storage import models as fs_models
-from polyfile.storage.backends import BaseStorageBackend
 from polyfile.storage.handler import fs_storages
 
 
@@ -15,8 +15,10 @@ class FsStorageFieldFile(FieldFile):
 
     def __init__(self, instance: "fs_models.FsNode", field: models.FileField, name: str):
         super().__init__(instance, field, name)
-        # todo: where is storage=None?
-        self.storage: BaseStorageBackend | None = instance.storage_id and fs_storages[instance.storage_id]
+        # self.storage is None in non-existent nodes, like root node
+        self.storage: BaseStorageBackend | None = None
+        if instance.storage_id:
+            self.storage = fs_storages[instance.storage_id]
 
     def download_url(self) -> str:
         """Public url."""

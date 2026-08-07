@@ -36,6 +36,10 @@ class Storage(models.Model, StandardModelType['Storage']):
         blank=True, null=False,
     )
 
+    class Meta:
+        verbose_name = 'Storage'
+        verbose_name_plural = 'Storages'
+
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.pk}>"
 

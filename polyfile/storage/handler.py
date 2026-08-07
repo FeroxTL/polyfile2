@@ -4,7 +4,7 @@ from django.apps.registry import apps
 from django.core.files.storage import InvalidStorageError, StorageHandler
 from django.utils.functional import cached_property
 
-from polyfile.storage.backends import BaseStorageBackend
+from polyfile.backends.base import BaseStorageBackend
 
 logger = logging.getLogger(__name__)
 

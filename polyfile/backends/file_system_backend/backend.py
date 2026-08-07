@@ -1,6 +1,6 @@
 import hashlib
 
-from django import forms, http
+from django import http
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -10,7 +10,8 @@ from django.http import HttpRequest
 from django.http.multipartparser import MultiPartParserError
 from django.urls import reverse
 
-from polyfile.storage.backends import BaseStorageBackend
+from polyfile.backends.base import BaseStorageBackend
+from polyfile.storage.models import FsNode
 from polyfile.storage.tokens import default_token_generator
 from polyfile.storage.utils import get_mime_type
 
@@ -45,7 +46,7 @@ class RawFileParser:
         return self._input_data.read(chunk_size)
 
 
-class LocalDiskBackend(FileSystemStorage, BaseStorageBackend):
+class FileSystemBackend(FileSystemStorage, BaseStorageBackend):
     """Stores files in a directory on the local device."""
     chunk_size = 64 * 2 ** 10  # The default chunk size is 64 KB.
 
@@ -55,23 +56,13 @@ class LocalDiskBackend(FileSystemStorage, BaseStorageBackend):
         self.base_location = location
         super().__init__(*args, **kwargs)
 
-    @classmethod
-    def get_option_fields(cls) -> dict[str, forms.Field]:
-        return {
-            'location': forms.CharField(
-                required=True,
-                label='Location',
-                widget=forms.TextInput(attrs={'placeholder': 'Location'}),
-            ),
-        }
-
     def download_url(self, instance: models.Model):
         return reverse('download_file', kwargs={
             'pk': instance.pk,
             'token': default_token_generator.make_token(instance),
         })
 
-    def save_file(self, fs_node: models.Model, request: HttpRequest) -> None:
+    def save_file(self, fs_node: FsNode, request: HttpRequest) -> None:
         """Save request into file."""
         # Create empty file
         fs_node.file.save(fs_node.name, ContentFile(''), save=False)

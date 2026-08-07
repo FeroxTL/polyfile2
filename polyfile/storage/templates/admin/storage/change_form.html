@@ -1,0 +1,8 @@
+{% extends "admin/change_form.html" %}
+
+{% block messages %}
+    <ul class="messagelist">
+      <li class="warning">Do not modify Storage class directly. Use backends</li>
+    </ul>
+    {{ block.super }}
+{% endblock %}
