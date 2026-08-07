@@ -5,7 +5,8 @@ from polyfile.storage.handler import fs_storages
 from polyfile.storage.models import Storage
 
 
-@receiver([post_save, post_delete], sender=Storage)
-def _invalidate_storages(**kwargs) -> None:
+@receiver([post_save, post_delete])
+def _invalidate_storages(sender, **kwargs) -> None:
     """Invalidate storages caches."""
-    fs_storages.clear()
+    if issubclass(sender, Storage):
+        fs_storages.clear()

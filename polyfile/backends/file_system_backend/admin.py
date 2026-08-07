@@ -10,6 +10,7 @@ from polyfile.backends.utils import get_storage_path
 class LocalDiskStorageForm(ModelForm):
     backend_path: str = get_storage_path(FileSystemBackend)
     location = fields.CharField(required=True)
+    upload_to = fields.CharField(required=False)
 
     class Meta:
         model = LocalDiskStorage
@@ -19,11 +20,13 @@ class LocalDiskStorageForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['location'].initial = self.instance.options.get('location', '')
+        self.fields['upload_to'].initial = self.instance.options.get('upload_to', '')
 
     def save(self, commit: bool = True) -> LocalDiskStorage:
         self.instance.backend = self.backend_path
         self.instance.options.update({
             'location': self.cleaned_data['location'],
+            'upload_to': self.cleaned_data['upload_to'],
         })
         return super().save(commit=commit)
 

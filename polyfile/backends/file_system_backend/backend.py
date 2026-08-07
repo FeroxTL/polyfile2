@@ -1,14 +1,18 @@
 import hashlib
+import posixpath
+from typing import IO, Any
 
 from django import http
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
+from django.core.files.utils import validate_file_name
 from django.db import models
 from django.http import HttpRequest
 from django.http.multipartparser import MultiPartParserError
 from django.urls import reverse
+from django.utils.timezone import now
 
 from polyfile.backends.base import BaseStorageBackend
 from polyfile.storage.models import FsNode
@@ -50,10 +54,11 @@ class FileSystemBackend(FileSystemStorage, BaseStorageBackend):
     """Stores files in a directory on the local device."""
     chunk_size = 64 * 2 ** 10  # The default chunk size is 64 KB.
 
-    def __init__(self, location: str | None = None, *args, **kwargs):
+    def __init__(self, location: str | None = None, upload_to: str = '', *args, **kwargs):
         if not location:
             raise ValidationError({'location': 'This field is required!'})
         self.base_location = location
+        self.upload_to = upload_to
         super().__init__(*args, **kwargs)
 
     def download_url(self, instance: models.Model):
@@ -64,8 +69,13 @@ class FileSystemBackend(FileSystemStorage, BaseStorageBackend):
 
     def save_file(self, fs_node: FsNode, request: HttpRequest) -> None:
         """Save request into file."""
+        # Generate filename
+        dirname = now().strftime(self.upload_to)
+        filename = posixpath.join(dirname, fs_node.name)
+        filename = validate_file_name(filename, allow_relative_path=True)
+
         # Create empty file
-        fs_node.file.save(fs_node.name, ContentFile(''), save=False)
+        fs_node.file.save(filename, ContentFile(''), save=False)
         fs_node.save(update_fields=('file',))
 
         # File content is in request.body
