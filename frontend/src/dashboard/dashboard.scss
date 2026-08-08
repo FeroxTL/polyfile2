@@ -12,6 +12,15 @@ html, body {
   overflow: hidden;
 }
 
+/* Transfers Bootstrap's default focus ring to the entire .btn wrapper of input[type=file] */
+label.btn:focus-within:has(> input[type=file]) {
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.fsnode-icon {
+  height: 1.5rem;
+}
+
 @include media-breakpoint-down(sm) {
   // Save horizontal space on xs
   .container-fluid {

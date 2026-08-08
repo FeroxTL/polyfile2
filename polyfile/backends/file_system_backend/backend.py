@@ -76,7 +76,7 @@ class FileSystemBackend(FileSystemStorage, BaseStorageBackend):
 
         # Create empty file
         fs_node.file.save(filename, ContentFile(''), save=False)
-        fs_node.save(update_fields=('file',))
+        fs_node.save(update_fields=('file', 'modified_at'))
 
         # File content is in request.body
         parser = RawFileParser(request=request)

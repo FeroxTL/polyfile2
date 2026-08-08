@@ -3,12 +3,11 @@ import { API_V1_FSNODE_TOUCH } from "../urls";
 import m from "mithril";
 
 
-const uploadFile = (e) => {
+const uploadFile = (e) => (
   Array.from(e.target.files).map((file) => (
     // Create FsNode
-    m.request({
+    m.request(API_V1_FSNODE_TOUCH, {
       method: "POST",
-      url: API_V1_FSNODE_TOUCH,
       headers: {
         "Content-Type": "application/json",
       },
@@ -18,26 +17,28 @@ const uploadFile = (e) => {
     })
     .then((data) => {
       // Update FsNodeList
-      const fsNode = new FsNode(data);
+      const fsNode = new FsNode({...data, ...{upload_status: "uploading"}});
       FsNodeList.addFsNode(fsNode);
       FsNodeList.selectFsNode(fsNode);
 
       // Upload file content
-      return m.request({
+      m.request(data.upload_url, {
         method: "POST",
-        url: data.upload_url,
+        // Send binary data
         body: file,
         // Bypasses default JSON.stringify
         serialize: (value) => value,
       }).then((uploadData) => {
         Object.assign(fsNode, uploadData);
-      })
+        fsNode.upload_status = "done";
+      });
+      return data;
     })
     .catch((error) => {
       // TODO: error handling
       console.log('err', error);
     })
-  ));
-}
+  ))
+)
 
 export { uploadFile };

@@ -22,6 +22,7 @@ function FsNode(data) {
   this.path = data.path || "";
   this.download_url = data.download_url || "";
   this.selected = false;
+  this.upload_status = data.upload_status || "done";
 }
 
 /**
@@ -178,6 +179,54 @@ const FsNodeActionbarComponent = {
   }
 };
 
+const Spinner = {
+  view(vnode) {
+    return (
+      m(".spinner-border[role=status]", {
+        style: {
+          height: vnode.attrs.size,
+          width: vnode.attrs.size,
+        }
+      }, m("span.visually-hidden", "Loading"))
+    )
+  }
+}
+
+const FsNodeItemComponent = {
+  navigate(fsNode, event) {
+    if (fsNode.type !== "file") {
+      m.route.set(FILES_DASHBOARD_URL, {key: encodeURIComponent(`${FsNodeList.current.path  }/${  fsNode.name}`).replaceAll("%2F", "/")});
+    }
+    event.preventDefault();
+    return false;
+  },
+
+  view(vnode) {
+    const item = vnode.attrs.fsNode;
+
+    return (
+      m("li[role=button].list-group-item list-group-item-action list-group-item-light py-3 d-flex justify-content-between", {
+          key: item.name,
+          class: item.selected ? "active" : null,
+          'aria-current': item.selected ? String(item.selected) : null,
+          onclick: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            FsNodeList.selectFsNode(item);
+          },
+          ondblclick: this.navigate.bind(null, item),
+        }, [
+          item.upload_status === "done" ?
+            m("span.fsnode-icon", m("i.h4 mb-0 fa", { class: item.type === "directory" ? "fa-folder" : "fa-file" })) :
+            m(Spinner, { size: "1.5rem" }),
+          m("span.flex-grow-1 ms-2", item.name),
+          m("span.d-none .d-sm-block", item.type),
+        ]
+      )
+    )
+  }
+};
+
 // FsNode list component
 const FsNodeListComponent = {
   onDocumentClick(e) {
@@ -195,14 +244,6 @@ const FsNodeListComponent = {
 
   onremove() {
     document.removeEventListener("click", this.onDocumentClick);
-  },
-
-  navigate(fsNode, event) {
-    if (fsNode.type !== "file") {
-      m.route.set(FILES_DASHBOARD_URL, {key: encodeURIComponent(`${FsNodeList.current.path  }/${  fsNode.name}`).replaceAll("%2F", "/")});
-    }
-    event.preventDefault();
-    return false;
   },
 
   view() {
@@ -242,21 +283,7 @@ const FsNodeListComponent = {
         (FsNodeList.elements.length === 0) && m(FsNodeEmptyDirectoryComponent),
 
         m("ul.list-group user-select-none", FsNodeList.elements.map((item) => (
-          m("li[role=button].list-group-item list-group-item-action list-group-item-light py-3 d-flex justify-content-between", {
-            key: item.name,
-            class: item.selected ? "active" : null,
-            'aria-current': item.selected ? String(item.selected) : null,
-            onclick: (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              FsNodeList.selectFsNode(item);
-            },
-            ondblclick: this.navigate.bind(null, item),
-          }, [
-            m("span", m("i.h4 mb-0 fa", { class: item.type === "directory" ? "fa-folder" : "fa-file" })),
-            m("span.flex-grow-1 ms-2", item.name),
-            m("span.d-none .d-sm-block", item.type),
-          ])
+          m(FsNodeItemComponent, { fsNode: item })
         )))
       ])
     );

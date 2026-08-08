@@ -67,7 +67,9 @@ const DashboardSideBar = {
         m(".pt-3 border-top", [
           m("label.btn btn-primary w-100 mb-2", [
             m("span.fa fa-upload[aria-hidden=true]"), " ", "Upload",
-            m("input.d-none[type=file]", { onchange: uploadFile }),
+            m("input.visually-hidden w-100[type=file]", {
+              onchange: uploadFile,
+            }),
           ]),
           m("button.btn btn-outline-secondary w-100", {
             onclick: () => showModal(CreateDirectoryModalComponent.modalId),
