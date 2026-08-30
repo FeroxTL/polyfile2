@@ -17,14 +17,13 @@ export default defineConfig([
       "no-warning-comments": "off",
       "one-var": "off",
       "sort-keys": "off",
-      "no-unused-expressions": "off",
       "max-statements": "off",
       "no-console": "warn",
       "max-lines": "warn",
       "max-lines-per-function": "warn",
       "no-ternary": "off",
       "no-magic-numbers": ["warn", {
-        "ignore": [-1, 0, 1],
+        "ignore": [-1, 0, 1, 2],
       }],
       "no-plusplus": "off",
       // TODO: enable

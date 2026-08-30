@@ -4,7 +4,7 @@ const Input = {
   view(vnode) {
     if (!vnode.attrs.stream) {
       throw new Error("Argument 'stram' is required")
-    };
+    }
 
     const { errors, required, stream } = vnode.attrs;
 

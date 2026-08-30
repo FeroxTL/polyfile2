@@ -41,7 +41,7 @@ and integrates seamlessly with Django’s built-in authentication system.
 - 0.2.0
   - SPA
     - [x] Handle correct order when FsNode created / renamed
-    - [ ] Simple file viewer (at least images)
+    - [x] Simple file viewer (at least images)
     - [ ] Shared access / public download
     - [ ] Remove nested directories (async?)
     - [ ] Upload queue
@@ -58,6 +58,7 @@ and integrates seamlessly with Django’s built-in authentication system.
   - SPA
     - JavaScript prettify and code style
     - Right click menu support
+    - Image viewer - zoom to cursor
   - Initial setup on first run
     - Create and log in superuser
     - Create and setup first `Storage`

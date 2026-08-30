@@ -1,0 +1,52 @@
+/*
+Image viewer css.
+
+Explicitly sets all elements height to 100% (all elements have `position:relative` until `.modal` that is absolute).
+*/
+
+.image-viewer-modal > .modal-content {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+.image-viewer-modal > .modal-content > .modal-body {
+  padding: 0;
+  overflow: hidden; /* Explicitly hide scrollbars */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-viewer-modal .carousel {
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+}
+
+.image-viewer-modal .carousel-inner {
+  /* Fallback for all browsers */
+  height: 100%;
+  /* Perfect fit on mobile */
+  height: 100dvh;
+}
+
+.image-viewer-modal .carousel-control-prev, .image-viewer-modal .carousel-control-next {
+  max-width: 5rem;
+}
+
+.image-viewer-modal .carousel-item {
+  height: 100%;
+}
+
+.image-viewer-modal .carousel-item img {
+  max-width: 100%;
+  min-width: 30vh;
+  max-height: 100%;
+  margin: auto;
+  object-fit: contain;
+  transition: transform 0.1s ease-out;
+  transform-origin: center center;
+  touch-action: none;
+  user-select: none;
+}

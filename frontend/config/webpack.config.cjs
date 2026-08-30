@@ -22,6 +22,7 @@ module.exports = (env, argv) => {
         import: [
           path.resolve(srcDir, "dashboard", "index.js"),
           path.resolve(srcDir, "dashboard", "dashboard.scss"),
+          path.resolve(srcDir, "dashboard", "image-viewer.scss"),
         ],
         dependOn: "vendor",
       },

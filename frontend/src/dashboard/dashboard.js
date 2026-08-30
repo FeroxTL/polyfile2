@@ -2,12 +2,14 @@
 import m from "mithril";
 import DashboardSideBar from "./sidebar";
 import DashboardNavBar from "./navbar";
-import { API_V1_FSNODE, DEFAULT_ROOT_URL, FILES_DASHBOARD_URL } from "./urls";
-import { ModalBackdrop, showModal } from "./bootstrap/modal";
-import CreateDirectoryModalComponent from "./modals/create_directory_modal";
+import {API_V1_FSNODE, DEFAULT_ROOT_URL, FILES_DASHBOARD_URL} from "./urls";
+import {ModalsAndBackdrop, showModal} from "./bootstrap/modal";
 import RemoveFsNodeModalComponent from "./modals/remove_fsnode_modal";
-import { uploadFile } from "./modals/uploader";
+import {uploadFile} from "./modals/uploader";
 import Card from "./bootstrap/card";
+import {Spinner} from "./bootstrap/spinner";
+import {FsNodeListBreadcrumbsComponent} from "./breadcrumbs";
+import ImageViewerModal from "./image_viewer";
 
 // FsNode model
 function FsNode(data) {
@@ -87,26 +89,6 @@ const FsNodeList = {
   },
 };
 
-// FsNode breadcrumbs component
-const FsNodeListBreadcrumbsComponent = {
-  view() {
-    if (FsNodeList.current === null) {return null};
-
-    return (
-      m("nav[aria-label=breadcrumb]",
-        m("ol.breadcrumb mb-0", FsNodeList.current.path.split("/").map((item, index, array) => {
-          const isLast = index === array.length - 1,
-           itemName = index === 0 ? "Files" : item,
-           url = encodeURIComponent(`/disk${  array.slice(0, index + 1).join("/")}`).replaceAll("%2F", "/");
-          return m("li.breadcrumb-item", {
-            class: isLast ? "active" : null,
-          }, isLast ? itemName : m(m.route.Link, { href: url }, itemName))
-        }))
-      )
-    )
-  }
-};
-
 // Empty directory component
 const FsNodeEmptyDirectoryComponent = {
   view() {
@@ -119,7 +101,7 @@ const FsNodeEmptyDirectoryComponent = {
               m("p.card-text text-secondary", "Select files to upload"),
               m("label.btn btn-primary", [
                 m("span.fa fa-upload[aria-hidden=true]"), " ", "Upload",
-                m("input.d-none[type=file]", { onchange: uploadFile }),
+                m("input.d-none[type=file][multiple]", { onchange: uploadFile }),
               ]),
             ])
           ])
@@ -167,7 +149,7 @@ const FsNodeActionbarComponent = {
           }, [m("span.fa fa-arrow-right-arrow-left[aria-hidden=true]"), " ", m("span.d-lg-inline-block d-none", "Move")]),
           m("a.btn btn-outline-light me-md-2", {
             title: "Remove",
-            onclick: () => { showModal(RemoveFsNodeModalComponent.modalId); },
+            onclick: () => { showModal(RemoveFsNodeModalComponent) },
           }, [m("span.fa fa-trash[aria-hidden=true]"), " ", m("span.d-lg-inline-block d-none", "Remove")]),
           m("a.btn btn-outline-light", {
             title: "Close",
@@ -179,22 +161,12 @@ const FsNodeActionbarComponent = {
   }
 };
 
-const Spinner = {
-  view(vnode) {
-    return (
-      m(".spinner-border[role=status]", {
-        style: {
-          height: vnode.attrs.size,
-          width: vnode.attrs.size,
-        }
-      }, m("span.visually-hidden", "Loading"))
-    )
-  }
-}
 
 const FsNodeItemComponent = {
   navigate(fsNode, event) {
-    if (fsNode.type !== "file") {
+    if (fsNode.type === "file") {
+      showModal(ImageViewerModal, { currentImg: fsNode, items: FsNodeList.elements.filter(item => item.type === "file") });
+    } else {
       m.route.set(FILES_DASHBOARD_URL, {key: encodeURIComponent(`${FsNodeList.current.path  }/${  fsNode.name}`).replaceAll("%2F", "/")});
     }
     event.preventDefault();
@@ -257,11 +229,11 @@ const FsNodeListComponent = {
         errorMessage = FsNodeList.error.response.detail;
       }
 
-      return m(Card, { class: "w-50 align-self-center mt-5 bg-warning" }, [
+      return m(Card, { class: "w-50 align-self-center mt-5 bg-warning", title: "Error" }, [
         m("p.card-text", errorMessage),
-        (FsNodeList.error.code === 0) &&
-          m("a", { href: "#", class: "btn btn-primary me-2", onclick: () => window.location.reload() }, "Refresh page") ||
-          m(m.route.Link, { href: DEFAULT_ROOT_URL, class: "btn btn-primary me-2" }, "Main page"),
+        (FsNodeList.error.code === 0)
+          && m("a", { href: "#", class: "btn btn-primary me-2", onclick: () => window.location.reload() }, "Refresh page")
+          || m(m.route.Link, { href: DEFAULT_ROOT_URL, class: "btn btn-primary me-2" }, "Main page"),
       ]);
     }
 
@@ -311,12 +283,7 @@ const DashboardView = {
       ]),
 
       // Modals
-      // Create directory modal
-      m(CreateDirectoryModalComponent),
-      // Remove FsNode modal
-      m(RemoveFsNodeModalComponent),
-      // Modal backdrop
-      m(ModalBackdrop),
+      m(ModalsAndBackdrop),
     ]
   },
 };

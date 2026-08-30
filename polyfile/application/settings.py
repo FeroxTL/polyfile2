@@ -22,7 +22,7 @@ SECRET_KEY = env.str('SECRET_KEY', 'django-insecure-o_d=g9_#sofs^h8p34x5!$$gkdlq
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', 'runserver' in sys.argv)
 TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.2.202', 'localhost']
 
 LOGIN_URL = reverse_lazy('accounts-login')
 

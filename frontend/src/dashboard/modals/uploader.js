@@ -3,6 +3,8 @@ import { API_V1_FSNODE_TOUCH } from "../urls";
 import m from "mithril";
 
 
+// TODO: do we need selection of uploaded nodes? I think no.
+//  Maybe we should show them as "new files"
 const uploadFile = (e) => (
   Array.from(e.target.files).map((file) => (
     // Create FsNode

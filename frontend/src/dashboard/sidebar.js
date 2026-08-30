@@ -1,8 +1,8 @@
-import CreateDirectoryModalComponent from "./modals/create_directory_modal";
+import CreateDirectoryModal from "./modals/create_directory_modal";
 import { NavLink } from "./bootstrap/navlink";
 import Collapse from "./bootstrap/collapse";
 import m from "mithril";
-import { showModal } from "./bootstrap/modal";
+import {showModal} from "./bootstrap/modal";
 import { uploadFile } from "./modals/uploader";
 import { API_V1_LOGOUT } from "./urls";
 import Button from "./bootstrap/button";
@@ -67,12 +67,12 @@ const DashboardSideBar = {
         m(".pt-3 border-top", [
           m("label.btn btn-primary w-100 mb-2", [
             m("span.fa fa-upload[aria-hidden=true]"), " ", "Upload",
-            m("input.visually-hidden w-100[type=file]", {
+            m("input.visually-hidden w-100[type=file][multiple]", {
               onchange: uploadFile,
             }),
           ]),
           m("button.btn btn-outline-secondary w-100", {
-            onclick: () => showModal(CreateDirectoryModalComponent.modalId),
+            onclick: () => showModal(CreateDirectoryModal),
           }, [m("span.fa fa-folder-plus[aria-hidden=true]"), " ", "Create"]),
         ]),
 
