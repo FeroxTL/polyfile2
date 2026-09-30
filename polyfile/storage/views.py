@@ -1,7 +1,7 @@
 import uuid
 from pathlib import Path
 
-from django.contrib.auth.decorators import login_not_required
+from django.contrib.auth.decorators import login_not_required, login_required
 from django.http import (
     FileResponse,
     Http404,
@@ -14,12 +14,12 @@ from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
 from django.views.static import was_modified_since
 
+from polyfile.accounts.models import User
 from polyfile.application.api_v1 import api_v1_schemas
 from polyfile.application.exceptions import NotFound, PermissionDenied
 from polyfile.backends.base import BaseStorageBackend
 from polyfile.storage.decorators import catch_storage_exceptions
 from polyfile.storage.models import ChunkedStatus, FsNode, FsNodeTypeChoices, TempUpload
-from polyfile.storage.tokens import default_token_generator
 
 
 def serve(request: HttpRequest, fs_node: FsNode, as_attachment: bool = False):
@@ -48,16 +48,27 @@ def serve(request: HttpRequest, fs_node: FsNode, as_attachment: bool = False):
     return resp
 
 
+def has_download_access(user: User, fs_node: FsNode) -> bool:
+    """
+    Check if user has access to download the file.
+
+    Currently only owner can download. In the future, this can be extended
+    to support shared access, group permissions, etc.
+    """
+    return fs_node.owner_id == user.id
+
+
+@login_required
 @catch_storage_exceptions
-def download_file_view(request: HttpRequest, pk: uuid.UUID, token: str):
-    """Download file."""
+def download_file_view(request: HttpRequest, pk: uuid.UUID):
+    """Download file. Requires authentication and ownership."""
     try:
         fs_node: FsNode = FsNode.objects.get(type=FsNodeTypeChoices.FILE, id=pk)
     except FsNode.DoesNotExist:
-        raise NotFound('File not found')  # TODO: specify/translate error text
+        raise NotFound('File not found')
 
-    if not default_token_generator.check_token(fs_node=fs_node, token=token):
-        raise PermissionDenied('Invalid token')  # TODO: specify/translate error text
+    if not has_download_access(request.user, fs_node):
+        raise PermissionDenied('You do not have access to this file')
 
     return serve(
         request=request,
@@ -70,7 +81,11 @@ def download_file_view(request: HttpRequest, pk: uuid.UUID, token: str):
 @csrf_exempt
 @catch_storage_exceptions
 def upload_file_view(request: HttpRequest, token: str):
-    """Upload file."""
+    """
+    Upload file.
+
+    User is authenticated with `token`, login not required.
+    """
     try:
         temp_upload: TempUpload = TempUpload.objects.select_related('fs_node').get(
             token=token,

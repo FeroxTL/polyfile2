@@ -13,6 +13,7 @@ class User(AbstractUser, StandardModelType['User']):
         on_delete=models.SET_NULL,
     )
 
+    id: int | None
     storage_id: str | None
 
     @property

@@ -1,6 +1,5 @@
 import hashlib
 import posixpath
-from typing import IO, Any
 
 from django import http
 from django.conf import settings
@@ -16,7 +15,6 @@ from django.utils.timezone import now
 
 from polyfile.backends.base import BaseStorageBackend
 from polyfile.storage.models import FsNode
-from polyfile.storage.tokens import default_token_generator
 from polyfile.storage.utils import get_mime_type
 
 
@@ -64,7 +62,6 @@ class FileSystemBackend(FileSystemStorage, BaseStorageBackend):
     def download_url(self, instance: models.Model):
         return reverse('download_file', kwargs={
             'pk': instance.pk,
-            'token': default_token_generator.make_token(instance),
         })
 
     def save_file(self, fs_node: FsNode, request: HttpRequest) -> None:
