@@ -11,7 +11,7 @@ const uploadFile = (e) => (
     m.request(API_V1_FSNODE_TOUCH, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "core/json",
       },
       params: {
         "path": `${FsNodeList.current.path}/${file.name}`,
