@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from django import http
-from django.contrib.auth import logout as dj_logout
+from django.contrib.auth import logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -45,7 +45,7 @@ class LogoutView(BaseApiView):
     def post(request: RequestType) -> http.HttpResponse:
         """Logout and invalidate session."""
         assert request.user.is_authenticated and isinstance(request.user, User)
-        dj_logout(request)
+        logout(request)
 
         return http.JsonResponse(
             status=204,

@@ -13,7 +13,7 @@ class DashboardUrl:
 
 def get_sidebar_urls(user: AbstractUser) -> list[DashboardUrl]:
     sidebar_urls: list[DashboardUrl] = [
-        DashboardUrl(id='files', name='Files', url=reverse('files_dashboard', kwargs={'path': '/'})),
+        DashboardUrl(id='files', name='Files', url=reverse('fs_node_browse', kwargs={'path': '/'})),
     ]
 
     if user.is_staff or user.is_superuser:

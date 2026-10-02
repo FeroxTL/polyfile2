@@ -7,7 +7,7 @@ from marshmallow import Schema, fields, validate
 from polyfile.apps.storage.models import FsNode, FsNodeTypeChoices
 
 
-class PathField(fields.Field[str]):
+def ensure_absolute_path(value: str | bytes) -> PurePosixPath:
     """
     Adapts path to CTE queryset appropriate.
 
@@ -18,29 +18,35 @@ class PathField(fields.Field[str]):
     "foo/bar" -> "/foo/bar"
     "/foo/bar" -> "/foo/bar"
     "/foo/bar/" -> "/foo/bar"
+    "//foo/bar/" -> "/foo/bar"
     "/foo/bar.jpg" -> "/foo/bar.jpg"
+
+    :raises UnicodeDecodeError: If path can not be decoded.
     """
+    path = PurePosixPath(fields.utils.ensure_text_type(value))
+
+    if not path.is_absolute():
+        # Handles relative paths ("foo/bar")
+        path = PurePosixPath("/") / path
+
+    if path.is_relative_to("//"):
+        # Handles "network shared" files ("//foo/bar")
+        path = PurePosixPath("/") / path.relative_to("//")
+
+    return path
+
+
+class PathField(fields.Field[str]):
+    """Uses `ensure_absolute_path` for path validation."""
     default_error_messages: marshmallow.types.ErrorMessages = {
         'invalid_utf8': 'Not a valid utf-8 string.',
     }
 
     def _deserialize(self, value: typing.Any, *args, **kwargs) -> PurePosixPath:
         try:
-            value = fields.utils.ensure_text_type(value)
+            return ensure_absolute_path(value)
         except UnicodeDecodeError as error:
             raise self.make_error('invalid_utf8') from error
-
-        path = PurePosixPath(value)
-
-        if not path.is_absolute():
-            # Handles relative paths ("foo/bar")
-            path = PurePosixPath('/') / path
-
-        if path.is_relative_to('//'):
-            # Handles "network shared" files ("//foo/bar")
-            path = PurePosixPath('/') / path.relative_to('//')
-
-        return path
 
 
 # == FsNode list ==

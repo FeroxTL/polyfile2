@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'polyfile.core',
     'polyfile.apps.accounts',
     'polyfile.apps.storage',
+    'polyfile.apps.share',
     'polyfile.contrib.backends',
 ]
 

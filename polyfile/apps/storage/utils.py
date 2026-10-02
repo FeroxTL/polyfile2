@@ -1,6 +1,6 @@
 import hashlib
 import pathlib
-import typing
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
@@ -34,20 +34,25 @@ def get_mime_type(file: File) -> str:
 @dataclass
 class FsNodeWithChildren:
     current: FsNode | None
-    children: typing.Iterable[FsNode]
+    children: Iterable[FsNode]
 
 
-def get_fs_node_with_children(user: User, path: PurePosixPath) -> FsNodeWithChildren:
+def get_fs_node_with_children(
+        user: User,
+        path: PurePosixPath,
+        parent_fs_node: FsNode | None = None,
+) -> FsNodeWithChildren:
     """
     Retrieve FsNode (file/directory) by path and its children (if any).
 
     :param user: directory owner.
     :param path: listed path.
+    :param parent_fs_node: parent node.
     :raises HttpException: most of the errors.
     :return FsNodeWithChildren: current FsNode and child FsNodes.
     """
     try:
-        fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=path)
+        fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=path, parent_fs_node=parent_fs_node)
     except FsNode.DoesNotExist:
         raise exceptions.FsNodeNotFoundError(
             detail=f'Can not access "{path}" - no such file or directory',
@@ -80,7 +85,7 @@ def get_fs_node_with_children(user: User, path: PurePosixPath) -> FsNodeWithChil
             models.When(type=FsNodeTypeChoices.DIRECTORY, then=models.Value(1)),
             default=models.Value(2),
             output_field=models.IntegerField()
-        )
+        ),
     ).order_by('sort_priority', 'name')
 
     return FsNodeWithChildren(
@@ -114,7 +119,7 @@ def create_fs_node(
         raise exceptions.InvalidFsNodeName(detail=', '.join(e.messages))
 
     if parent_path == PurePosixPath('/'):
-        base_qs, parent_fs_node = FsNode.objects, None
+        base_qs, parent_fs_node = FsNode.objects.all(), None
     else:
         base_qs = FsNode.objects.filter(parent__type=FsNodeTypeChoices.DIRECTORY)
         try:

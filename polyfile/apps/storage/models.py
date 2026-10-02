@@ -93,7 +93,11 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
 
     @property
     def path(self) -> str:
-        """Full path in Storage."""
+        """
+        Full path in Storage.
+
+        This property is only available in CTE selections (when query is annotated).
+        """
         assert self._path is not None, (
             f"No \"path\" attribute was provided using annotations "
             f"({self.__class__.__name__}.objects.annotate(...)) or direct assignments."

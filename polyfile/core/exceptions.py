@@ -12,6 +12,9 @@ class HttpException(Exception):
     def __init__(self, detail: typing.Any = None):
         self.detail: typing.Any = detail or self.description
 
+    def __str__(self) -> str:
+        return f'{self.error_code}: {self.description}'
+
 
 class NotFound(HttpException):
     """Resource not found."""

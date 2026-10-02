@@ -7,7 +7,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Polyfile</title>
-    <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'files_dashboard' '/' %}" />
+    <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'fs_node_browse' '/' %}" />
     <script id="dashboard-urls" type="application/json">{{dashboard_urls|safe}}</script>
     {% render_bundle 'vendor' 'css' %}
     {% render_bundle 'dashboard' 'css' %}
