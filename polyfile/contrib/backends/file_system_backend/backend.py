@@ -15,7 +15,7 @@ from django.utils.timezone import now
 
 from polyfile.apps.storage.models import FsNode
 from polyfile.apps.storage.utils import get_mime_type
-from polyfile.contrib.backends.base import BaseStorageBackend
+from polyfile.contrib.backends.base import FsBackendBase
 
 
 class RawFileParser:
@@ -48,7 +48,7 @@ class RawFileParser:
         return self._input_data.read(chunk_size)
 
 
-class FileSystemBackend(FileSystemStorage, BaseStorageBackend):
+class FileSystemBackend(FileSystemStorage, FsBackendBase):
     """Stores files in a directory on the local device."""
     chunk_size = 64 * 2 ** 10  # The default chunk size is 64 KB.
 

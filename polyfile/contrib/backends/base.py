@@ -3,7 +3,7 @@ from django.db import models
 from django.http import HttpRequest
 
 
-class BaseStorageBackend(Storage):
+class FsBackendBase(Storage):
     name = None
 
     def download_url(self, instance: models.Model):

@@ -8,13 +8,19 @@ from django.utils import timezone
 
 
 class ActiveShareNodeManager(models.Manager):
+    """
+    Manager for SharedNode models to filter for active shares.
+
+    Active shares are considered to be those that have not been revoked and 
+    have either no expiration date or an expiration date in the future.
+    """
     def get_queryset(self) -> models.QuerySet:
         """Return active shares."""
         return (
             super()
             .get_queryset()
             .filter(
-                Q(expires_at__isnull=True) | Q(expires_at__lte=timezone.now()),
+                Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
                 revoked_at__isnull=True,
             )
         )
@@ -24,10 +30,10 @@ class SharedNode(models.Model):
     """Public share of FsNode."""
 
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
-    root_fs_node = models.ForeignKey(
+    root_fs_node = models.OneToOneField(
         "storage.FsNode",
         on_delete=models.CASCADE,
-        related_name="shares",
+        related_name="share",
         db_index=True,
     )
 

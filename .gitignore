@@ -14,9 +14,16 @@
 
 # Artifacts
 media
+local
+.codex
+coverage/
+.playwright-mcp/
 
 # build
 dist
 webpack-dev-stats.json
 web_dev_assets/
 polyfile/web_assets
+
+# Project
+.env

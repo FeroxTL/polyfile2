@@ -4,8 +4,13 @@ from django.urls import reverse
 from django_hint import RequestType
 
 from polyfile.apps.accounts.models import User
-from polyfile.apps.storage import schemas, utils
-from polyfile.apps.storage.models import FsNodeTypeChoices, TempUpload
+from polyfile.apps.storage import schemas
+from polyfile.apps.storage.models import FsNode, TempUpload
+from polyfile.apps.storage.utils import (
+    create_fs_node,
+    get_fs_node_with_children,
+    remove_fs_node,
+)
 from polyfile.core import exceptions
 from polyfile.core.api import BaseApiView
 
@@ -21,8 +26,10 @@ class FsNodeListApiView(BaseApiView):
         except marshmallow.ValidationError as e:
             raise exceptions.FieldValidationError(detail=e.messages)
 
-        fs_node_with_children = utils.get_fs_node_with_children(user=request.user, path=params['path'])
-        return http.JsonResponse(data=schemas.FsNodeListResponseSchema().dump(fs_node_with_children))
+        fs_node_with_children = get_fs_node_with_children(user=request.user, path=params['path'])
+        with schemas.ShareUrlRequestContext(request):
+            data = schemas.FsNodeListResponseSchema().dump(fs_node_with_children)
+        return http.JsonResponse(data=data)
 
     @staticmethod
     def delete(request: RequestType) -> http.HttpResponse:
@@ -34,7 +41,7 @@ class FsNodeListApiView(BaseApiView):
         except marshmallow.ValidationError as e:
             raise exceptions.FieldValidationError(detail=e.messages)
 
-        utils.remove_fs_node(user=request.user, path=params['path'])
+        remove_fs_node(user=request.user, path=params['path'])
         return http.HttpResponse(status=204)
 
 
@@ -50,10 +57,10 @@ class FsNodeMkdirApiView(BaseApiView):
             )
 
         params = schemas.FsNodeCreateRequestSchema().load(request.GET)
-        fs_node = utils.create_fs_node(
+        fs_node = create_fs_node(
             user=request.user,
             path=params['path'],
-            fs_node_type=FsNodeTypeChoices.DIRECTORY,
+            fs_node_type=FsNode.TypeChoices.DIRECTORY,
         )
         return http.JsonResponse(data=schemas.FsNodeItemSchema().dump(fs_node))
 
@@ -70,10 +77,10 @@ class FsNodeTouchApiView(BaseApiView):
             )
 
         params = schemas.FsNodeCreateRequestSchema().load(request.GET)
-        fs_node = utils.create_fs_node(
+        fs_node = create_fs_node(
             user=request.user,
             path=params['path'],
-            fs_node_type=FsNodeTypeChoices.FILE,
+            fs_node_type=FsNode.TypeChoices.FILE,
         )
         temp_upload = TempUpload.objects.create(fs_node=fs_node)
 

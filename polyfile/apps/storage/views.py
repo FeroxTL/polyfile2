@@ -9,12 +9,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 from polyfile.apps.storage import schemas, services
 from polyfile.apps.storage.decorators import catch_storage_exceptions
-from polyfile.apps.storage.models import (
-    FsNode,
-    FsNodeTypeChoices,
-    TempUpload,
-)
-from polyfile.contrib.backends.base import BaseStorageBackend
+from polyfile.apps.storage.models import FsNode, TempUpload
+from polyfile.contrib.backends.base import FsBackendBase
 from polyfile.core.exceptions import NotFound
 
 
@@ -23,7 +19,7 @@ from polyfile.core.exceptions import NotFound
 def download_file_view(request: HttpRequest, pk: uuid.UUID):
     """Download file. Requires authentication and ownership."""
     try:
-        fs_node: FsNode = FsNode.objects.get(type=FsNodeTypeChoices.FILE, id=pk)
+        fs_node: FsNode = FsNode.objects.get(type=FsNode.TypeChoices.FILE, id=pk)
     except FsNode.DoesNotExist:
         raise NotFound('File not found')
 
@@ -53,7 +49,7 @@ def upload_file_view(request: HttpRequest, token: str):
     except TempUpload.DoesNotExist:
         raise NotFound('Upload not found')  # TODO: specify/translate error text
 
-    storage: BaseStorageBackend = temp_upload.fs_node.file.storage
+    storage: FsBackendBase = temp_upload.fs_node.file.storage
     storage.save_file(
         fs_node=temp_upload.fs_node,
         request=request,

@@ -38,6 +38,7 @@ class PermissionDenied(HttpException):
 
 
 class FieldValidationError(HttpException):
+    # TODO: remove?
     status_code = 400
     error_code = 'FieldValidationError'
     description = _('Error validating fields.')

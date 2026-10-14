@@ -33,7 +33,21 @@ export default defineConfig([
       "func-style": "off",
       "capitalized-comments": "warn",
       "no-unused-vars": "warn",
+      "max-params": "off",
     }
+  },
+  {
+    files: ["config/**/*.cjs"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      "prefer-named-capture-group": "off",
+      "require-unicode-regexp": "off",
+    },
   },
   { files: ["**/*.css"], plugins: { css }, language: "css/css" },
 ]);

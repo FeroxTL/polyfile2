@@ -1,8 +1,11 @@
 import hashlib
 import hmac
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from django.conf import settings
+from django.http import HttpRequest
+from django.urls import reverse
 from django.utils import timezone
 
 # Base date for time offset calculation (2020-01-01 00:00:00)
@@ -94,3 +97,36 @@ def validate_download_token(share_token: str, fs_node_pk: str, time_offset: str,
         return False
 
     return offset_to_time(time_offset) >= timezone.now()
+
+
+def get_public_share_url(request: HttpRequest, share_token: str | uuid.UUID) -> str:
+    """Build absolute URL of a public share root."""
+    return request.build_absolute_uri(reverse("share-browse", kwargs={
+        "share_token": str(share_token),
+        "path": "/",
+    }))
+
+
+def share_download_url(share_token: str | uuid.UUID, fs_node_id: str | uuid.UUID) -> str:
+    """
+    Generates a download URL for a specific FsNode within a SharedNode.
+
+    Args:
+        share_token: The SharedNode.token value.
+        fs_node_id: The FsNode.id value.
+
+    Returns:
+        A string containing the download URL or an empty string if inputs are missing.
+    """
+    share_token = str(share_token)
+    fs_node_id = str(fs_node_id)
+    expiration_time = timezone.now() + timedelta(hours=1)
+    time_offset = time_to_offset(expiration_time)
+    signature = generate_download_token(share_token, fs_node_id, expiration_time)
+
+    return reverse("share-download", kwargs={
+        "share_token": share_token,
+        "fs_node_id": fs_node_id,
+        "time_offset": time_offset,
+        "signature": signature,
+    })

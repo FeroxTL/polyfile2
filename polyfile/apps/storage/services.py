@@ -41,7 +41,7 @@ def serve_file(request: HttpRequest, fs_node: FsNode, skip_permission_check: boo
         return HttpResponseNotModified()
 
     return FileResponse(
-        fs_node.file.open('rb'),
+        fs_node.file.open("rb"),
         filename=fs_node.name,
         content_type=fs_node.mime_type or 'core/octet-stream',
         as_attachment=request.GET.get('disposition') == 'attachment',

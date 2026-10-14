@@ -6,7 +6,7 @@ from django_hint import StandardModelType
 class User(AbstractUser, StandardModelType['User']):
     """User model."""
     storage = models.ForeignKey(
-        'storage.Storage',
+        'storage.FsStorage',
         verbose_name='Storage',
         blank=True,
         null=True,

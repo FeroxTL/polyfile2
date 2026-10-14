@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Storage',
+            name='FsStorage',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=32, verbose_name='Name')),
@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Creation date')),
                 ('owner', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL, verbose_name='Owner')),
                 ('parent', models.ForeignKey(blank=True, limit_choices_to={'type': 'directory'}, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='children_set', to='storage.fsnode')),
-                ('storage', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='storage.storage', verbose_name='Storage')),
+                ('storage', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='storage.FsStorage', verbose_name='Storage')),
             ],
             options={
                 'verbose_name': 'Node',

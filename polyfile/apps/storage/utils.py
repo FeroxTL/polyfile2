@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import pathlib
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -11,9 +12,11 @@ from django.db import models
 
 from polyfile.apps.accounts.models import User
 from polyfile.apps.storage.managers import get_user_fs_node_by_path
-from polyfile.apps.storage.models import FsNode, FsNodeTypeChoices
+from polyfile.apps.storage.models import FsNode
 from polyfile.apps.storage.schemas import get_fs_node_name_validator
 from polyfile.core import exceptions
+
+logger = logging.getLogger(__name__)
 
 
 def get_md5_sum(file: File) -> str:
@@ -25,10 +28,15 @@ def get_md5_sum(file: File) -> str:
     return hash_md5.hexdigest()
 
 
+# noinspection PyBroadException
 def get_mime_type(file: File) -> str:
     """Get mimetype of file."""
     file.seek(0)
-    return magic.from_buffer(file.read(2048), mime=True)
+    try:
+        return magic.from_buffer(file.read(2048), mime=True)
+    except Exception:
+        logger.exception("Failed to determine the file's MIME type via 'magic'.")
+        return ""
 
 
 @dataclass
@@ -62,14 +70,14 @@ def get_fs_node_with_children(
         # Make fs_node fake root user directory
         fs_node = FsNode(
             name='',
-            type=FsNodeTypeChoices.DIRECTORY,
+            type=FsNode.TypeChoices.DIRECTORY,
             storage=None,
             storage_id=None,
             owner=user,
             created_at=user.date_joined,
             modified_at=user.date_joined,
         )
-        fs_node.path = ''
+        fs_node.path = '/'
         # Return all root nodes
         fs_node_children = FsNode.objects.filter(owner=user, parent__isnull=True)
     elif fs_node.is_file:
@@ -79,10 +87,10 @@ def get_fs_node_with_children(
         assert fs_node.is_directory
         fs_node_children = FsNode.objects.filter(owner=user, parent=fs_node)
 
-    fs_node_children = fs_node_children.annotate(
+    fs_node_children = fs_node_children.select_related("share").annotate(
         sort_priority=models.Case(
             # Directories go first
-            models.When(type=FsNodeTypeChoices.DIRECTORY, then=models.Value(1)),
+            models.When(type=FsNode.TypeChoices.DIRECTORY, then=models.Value(1)),
             default=models.Value(2),
             output_field=models.IntegerField()
         ),
@@ -97,7 +105,7 @@ def get_fs_node_with_children(
 def create_fs_node(
         user: User,
         path: PurePosixPath,
-        fs_node_type: FsNodeTypeChoices,
+        fs_node_type: FsNode.TypeChoices,
 ) -> FsNode:
     """
     Create FsNode.
@@ -121,7 +129,7 @@ def create_fs_node(
     if parent_path == PurePosixPath('/'):
         base_qs, parent_fs_node = FsNode.objects.all(), None
     else:
-        base_qs = FsNode.objects.filter(parent__type=FsNodeTypeChoices.DIRECTORY)
+        base_qs = FsNode.objects.filter(parent__type=FsNode.TypeChoices.DIRECTORY)
         try:
             parent_fs_node = get_user_fs_node_by_path(user=user, path=parent_path)
         except FsNode.DoesNotExist:

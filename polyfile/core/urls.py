@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib import admin
-from django.urls import include, path, reverse_lazy
+from django.urls import URLPattern, URLResolver, include, path, reverse_lazy
 from django.views.generic import RedirectView
 
 from polyfile.apps.storage.views import download_file_view, upload_file_view
@@ -26,9 +26,10 @@ public_page_patterns = [
         name="index",
     ),
     path("files<path:path>", fs_node_browse_view, name="fs_node_browse"),
+    path("shares", fs_node_browse_view, name="shares_dashboard"),
 ]
 
-urlpatterns = [
+urlpatterns: list[URLPattern | URLResolver] = [
     path("admin/", admin.site.urls),
     path("", include("polyfile.apps.accounts.urls")),
     path("", include("polyfile.apps.share.urls")),

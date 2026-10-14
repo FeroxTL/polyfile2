@@ -6,7 +6,7 @@ from django.db.models.fields.files import FieldFile
 
 from polyfile.apps.storage import models as fs_models
 from polyfile.apps.storage.handler import fs_storages
-from polyfile.contrib.backends.base import BaseStorageBackend
+from polyfile.contrib.backends.base import FsBackendBase
 
 
 class FsStorageFieldFile(FieldFile):
@@ -16,7 +16,7 @@ class FsStorageFieldFile(FieldFile):
     def __init__(self, instance: "fs_models.FsNode", field: models.FileField, name: str):
         super().__init__(instance, field, name)
         # self.storage is None in non-existent nodes, like root node
-        self.storage: BaseStorageBackend | None = None
+        self.storage: FsBackendBase | None = None
         if instance.storage_id:
             self.storage = fs_storages[instance.storage_id]
 

@@ -1,3 +1,5 @@
+import uuid
+from collections.abc import Iterable
 from functools import partial
 from pathlib import PurePosixPath
 
@@ -59,14 +61,13 @@ def get_user_fs_node_by_path(
 
     :param user: The AbstractBaseUser instance of the FsNode owner.
     :param path: The PurePosixPath to search for.
-    :param parent_fs_node: Optional FsNode. If provided, restricts the 
-                             search to its descendants.
+    :param parent_fs_node: Optional FsNode. If provided, restricts the search to its descendants.
     :return: The FsNode instance if found, otherwise None (for root path).
     :raises FsNode.DoesNotExist: If no matching node is found in the subtree.
     """
     if path == PurePosixPath('/'):
         if parent_fs_node is not None:
-            parent_fs_node.path = str(path / parent_fs_node.name)
+            parent_fs_node.path = "/"
         return parent_fs_node
 
     cte = CTE.recursive(partial(
@@ -80,3 +81,36 @@ def get_user_fs_node_by_path(
         .annotate(path=cte.col.path)
         .filter(path=path, owner=user)
     ).get()
+
+
+def get_user_fs_node_paths(
+        user: AbstractBaseUser,
+        node_ids: Iterable[uuid.UUID],
+) -> dict[uuid.UUID, str]:
+    """
+    Resolve full paths for a set of nodes owned by the given user.
+
+    This builds the same recursive CTE as :func:`get_user_fs_node_by_path`, but
+    returns a mapping so that a page of nodes can be resolved in a single query.
+
+    :param user: The AbstractBaseUser instance of the FsNode owner.
+    :param node_ids: Identifiers of the nodes to resolve.
+    :return: A mapping of node id to its full path. Unknown ids are omitted.
+    """
+    node_ids = list(node_ids)
+    if not node_ids:
+        return {}
+
+    cte = CTE.recursive(partial(
+        make_fs_node_cte,
+        base_queryset=FsNode.objects.filter(owner=user),
+        parent_fs_node=None,
+    ))
+    rows = with_cte(
+        cte,
+        select=cte.join(FsNode, id=cte.col.id)
+        .annotate(path=cte.col.path)
+        .filter(id__in=node_ids, owner=user)
+        .values("id", "path"),
+    )
+    return {row["id"]: row["path"] for row in rows}

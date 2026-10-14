@@ -1,3 +1,5 @@
+"use strict";
+
 const path = require("path");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const BundleTracker = require("webpack-bundle-tracker");
@@ -20,9 +22,16 @@ module.exports = (env, argv) => {
     entry: {
       dashboard: {
         import: [
-          path.resolve(srcDir, "dashboard", "index.js"),
-          path.resolve(srcDir, "dashboard", "dashboard.scss"),
-          path.resolve(srcDir, "dashboard", "image-viewer.scss"),
+          path.resolve(rootDir, "apps/dashboard/index.js"),
+          path.resolve(rootDir, "apps/dashboard/dashboard.scss"),
+          path.resolve(rootDir, "apps/dashboard/image-viewer.scss"),
+        ],
+        dependOn: "vendor",
+      },
+      publicShare: {
+        import: [
+          path.resolve(rootDir, "apps/public_share/index.js"),
+          path.resolve(rootDir, "apps/dashboard/image-viewer.scss"),
         ],
         dependOn: "vendor",
       },

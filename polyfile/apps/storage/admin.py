@@ -5,13 +5,14 @@ from django.forms import ALL_FIELDS, ModelForm
 from django.http import HttpRequest
 from django.utils.translation import gettext as _
 
-from polyfile.apps.storage.models import FsNode, Storage, TempUpload
+from polyfile.apps.storage.models import FsNode, FsStorage, TempUpload
 from polyfile.apps.storage.utils import get_md5_sum, get_mime_type
 
 
-@admin.register(Storage)
+@admin.register(FsStorage)
 class StorageAdmin(admin.ModelAdmin):
     list_display = ("name", "backend")
+    change_form_template = "admin/storage/fsstorage_change_form.html"
 
 
 class FsNodeAdminForm(ModelForm):

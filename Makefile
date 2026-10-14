@@ -1,5 +1,25 @@
-run:
-	./manage.py runserver
+manage = "./manage.py"
+current_dir = $(shell pwd)
 
-check:
-	ruff check .
+test:
+	@python $(manage) test --noinput --failfast
+
+ruff:
+	@ruff check .
+
+ruff-fix:
+	@ruff check . --fix
+
+ruff-format:
+	@ruff format . --check
+
+ruff-format-fix:
+	@ruff format .
+
+coverage:
+	@coverage erase
+	@coverage run $(manage) test --noinput --failfast
+	@coverage html --skip-covered
+	@echo
+	@echo
+	@echo "Coverage:" "file://"$(current_dir)"/local/htmlcov/index.html"

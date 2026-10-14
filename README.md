@@ -22,7 +22,7 @@ and integrates seamlessly with Django’s built-in authentication system.
 
 ## Roadmap
 - 0.1.0 (done)
-  - [x] Support of at least one `Storage` backend (file system)
+  - [x] Support of at least one `FsStorage` backend (file system)
   - SPA (web):
     - [x] List files and directories
     - [x] Create directories
@@ -61,7 +61,7 @@ and integrates seamlessly with Django’s built-in authentication system.
     - Image viewer - zoom to cursor
   - Initial setup on first run
     - Create and log in superuser
-    - Create and setup first `Storage`
+    - Create and setup first `FsStorage`
     - Create non-empty default profile
   - Authentication
     - Custom auth mechanism (like oauth2)

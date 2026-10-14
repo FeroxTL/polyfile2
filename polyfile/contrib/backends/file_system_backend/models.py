@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Model, QuerySet
 
-from polyfile.apps.storage.models import Storage
+from polyfile.apps.storage.models import FsStorage
 from polyfile.contrib.backends.file_system_backend.backend import FileSystemBackend
 from polyfile.contrib.backends.utils import get_storage_path
 
@@ -12,7 +12,7 @@ class LocalDiskStorageManager(models.Manager):
         return super().get_queryset().filter(backend=get_storage_path(FileSystemBackend))
 
 
-class LocalDiskStorage(Storage):
+class LocalDiskStorage(FsStorage):
     class Meta:
         proxy = True
         verbose_name = 'Local disk storage'

@@ -19,7 +19,7 @@ def get_backend_choices() -> dict[str, str]:
     }
 
 
-class Storage(models.Model, StandardModelType['Storage']):
+class FsStorage(models.Model, StandardModelType['FsStorage']):
     """Storage config."""
     name = models.CharField(
         verbose_name="Name",
@@ -54,7 +54,7 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
         blank=True,
     )
     storage = models.ForeignKey(
-        Storage,
+        FsStorage,
         verbose_name="Storage",
         on_delete=models.PROTECT,
     )
@@ -116,15 +116,14 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
         return result
 
 
-class FsNodeTypeChoices(models.TextChoices):
-    DIRECTORY = "directory", "Directory"
-    FILE = "file", "File"
-
-
 class FsNode(AbstractFsNode):
     """File or directory node."""
     id = models.UUIDField(primary_key=True, db_index=True, default=uuid.uuid4, blank=True)
     # TODO: check if CompositeKey(uuid4+user_id) can be primary key
+
+    class TypeChoices(models.TextChoices):
+        DIRECTORY = "directory", "Directory"
+        FILE = "file", "File"
 
     name = models.CharField(
         verbose_name="Name",
@@ -143,7 +142,7 @@ class FsNode(AbstractFsNode):
         verbose_name="Node type",
         max_length=16,
         db_index=True,
-        choices=FsNodeTypeChoices,
+        choices=TypeChoices,
     )
     parent = models.ForeignKey(
         "self",
@@ -155,7 +154,7 @@ class FsNode(AbstractFsNode):
         # Can not delete non-empty directory
         on_delete=models.PROTECT,
         # Can not create directory in file (not a database constraint, should be validated with `FsNode.clean_fields()`)
-        limit_choices_to={"type": FsNodeTypeChoices.DIRECTORY},
+        limit_choices_to={"type": TypeChoices.DIRECTORY},
     )
     created_at = models.DateTimeField(
         verbose_name="Creation date",
@@ -177,12 +176,12 @@ class FsNode(AbstractFsNode):
     @property
     def is_directory(self) -> bool:
         """Check if node is directory."""
-        return self.type == FsNodeTypeChoices.DIRECTORY
+        return self.type == self.TypeChoices.DIRECTORY
 
     @property
     def is_file(self) -> bool:
         """Check if node is file."""
-        return self.type == FsNodeTypeChoices.FILE
+        return self.type == self.TypeChoices.FILE
 
     def clean(self):
         super().clean()
@@ -207,7 +206,7 @@ class TempUpload(models.Model, StandardModelType['TempUpload']):
     fs_node = models.OneToOneField(
         FsNode,
         limit_choices_to={
-            'type': FsNodeTypeChoices.FILE,
+            'type': FsNode.TypeChoices.FILE,
         },
         on_delete=models.CASCADE,
     )

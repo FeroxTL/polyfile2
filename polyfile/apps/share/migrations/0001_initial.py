@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('expires_at', models.DateTimeField(blank=True, null=True)),
                 ('revoked_at', models.DateTimeField(blank=True, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('root_fs_node', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='shares', to='storage.fsnode')),
+                ('root_fs_node', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='share', to='storage.fsnode')),
                 ('owner', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='shared_nodes', to=settings.AUTH_USER_MODEL)),
             ],
             options={

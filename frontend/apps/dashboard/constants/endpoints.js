@@ -1,0 +1,25 @@
+const API_V1_FSNODE = "/api/v1/fs-node/",
+  API_V1_FSNODE_MKDIR = "/api/v1/fs-node/mkdir",
+  API_V1_FSNODE_TOUCH = "/api/v1/fs-node/touch",
+  API_V1_LOGOUT = "/api/v1/user/logout/",
+  API_V1_SHARE_CREATE = "/api/shares/create:path...",
+  API_V1_SHARE_LIST = "/api/shares/",
+  API_V1_SHARE_PERMANENT_DELETE = "/api/shares/:share_token/delete",
+  API_V1_SHARE_REVOKE = "/api/shares/:share_token/revoke",
+  DEFAULT_ROOT_URL = "/files",
+  FILES_DASHBOARD_URL = "/files:key...",
+  SHARES_DASHBOARD_URL = "/shares";
+
+export {
+  FILES_DASHBOARD_URL,
+  DEFAULT_ROOT_URL,
+  SHARES_DASHBOARD_URL,
+  API_V1_FSNODE,
+  API_V1_FSNODE_MKDIR,
+  API_V1_FSNODE_TOUCH,
+  API_V1_LOGOUT,
+  API_V1_SHARE_CREATE,
+  API_V1_SHARE_REVOKE,
+  API_V1_SHARE_PERMANENT_DELETE,
+  API_V1_SHARE_LIST,
+};

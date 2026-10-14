@@ -14,5 +14,5 @@ def fs_node_browse_view(request: HttpRequest, path: str = '') -> HttpResponse:
     dashboard_urls = json.dumps(list(map(asdict, get_sidebar_urls(request.user))))
 
     return render(request, "file_list.html", context={
-        'dashboard_urls': dashboard_urls,
+        "dashboard_urls": dashboard_urls,
     })

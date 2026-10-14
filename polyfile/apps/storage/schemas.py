@@ -2,9 +2,15 @@ import typing
 from pathlib import PurePosixPath
 
 import marshmallow.types
+from django.core.exceptions import ObjectDoesNotExist
 from marshmallow import Schema, fields, validate
+from marshmallow.experimental.context import Context
 
-from polyfile.apps.storage.models import FsNode, FsNodeTypeChoices
+from polyfile.apps.share.utils import get_public_share_url
+from polyfile.apps.storage.models import FsNode
+
+# Request is required to build absolute public share URLs.
+ShareUrlRequestContext = Context[object]
 
 
 def ensure_absolute_path(value: str | bytes) -> PurePosixPath:
@@ -77,9 +83,33 @@ class FsNodeItemSchema(Schema):
 
     @staticmethod
     def get_download_url(obj: FsNode) -> str:
-        if obj.type == FsNodeTypeChoices.FILE and obj.file:
+        if obj.is_file and obj.file:
             return obj.file.download_url()
         return ''
+
+    def get_share(self, obj: FsNode) -> dict[str, str] | None:
+        """Return public share info for an active share, if any."""
+        request = ShareUrlRequestContext.get(None)
+        if request is None or not obj.pk:
+            return None
+
+        try:
+            share = obj.share
+        except ObjectDoesNotExist:
+            return None
+
+        # TODO: convert to nested schema
+        return {
+            "id": str(share.token),
+            "url": get_public_share_url(request, share.token),
+            "expires_at": share.expires_at.isoformat() if share.expires_at else None,
+            "revoked_at": share.revoked_at.isoformat() if share.revoked_at else None,
+        }
+
+
+class FsNodeItemWithShareSchema(FsNodeItemSchema):
+    """FsNode list response item with public share info."""
+    share = fields.Method("get_share", dump_only=True, allow_none=True)
 
 
 class FsNodeCurrentSchema(FsNodeItemSchema):
@@ -87,10 +117,15 @@ class FsNodeCurrentSchema(FsNodeItemSchema):
     path = fields.Str(required=True, allow_none=False)
 
 
+class FsNodeCurrentWithShareSchema(FsNodeCurrentSchema):
+    """FsNode list response current node with public share info."""
+    share = fields.Method("get_share", dump_only=True, allow_none=True)
+
+
 class FsNodeListResponseSchema(Schema):
     """FsNode list response."""
-    current = fields.Nested(FsNodeCurrentSchema())
-    children = fields.Nested(FsNodeItemSchema(), many=True)
+    current = fields.Nested(FsNodeCurrentWithShareSchema())
+    children = fields.Nested(FsNodeItemWithShareSchema(), many=True)
 
 
 # == FsNode create directory ==
