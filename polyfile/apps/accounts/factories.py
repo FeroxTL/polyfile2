@@ -14,3 +14,4 @@ class UserFactory(factory.django.DjangoModelFactory):
     last_name = factory.Faker("last_name")
     email = factory.Faker("email")
     username = factory.Faker("user_name")
+    storage = factory.SubFactory('polyfile.apps.storage.factories.StorageFactory')

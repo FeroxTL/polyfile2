@@ -1,9 +1,21 @@
 import factory
+from django.db import models
+from django.http.request import HttpRequest
 
 from polyfile.apps.accounts.factories import UserFactory
 from polyfile.apps.storage.models import FsNode, FsStorage
-from polyfile.apps.storage.tests import TestFsBackend
+from polyfile.contrib.backends.base import FsBackendBase
 from polyfile.contrib.backends.utils import get_storage_path
+
+
+class TestFsBackend(FsBackendBase):
+    """Backend for testing the storage backend."""
+
+    def download_url(self, instance: models.Model) -> str:
+        return "/test/url/"
+
+    def save_file(self, fs_node: models.Model, request: HttpRequest) -> None:
+        pass
 
 
 class StorageFactory(factory.django.DjangoModelFactory):

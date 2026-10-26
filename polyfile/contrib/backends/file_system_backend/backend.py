@@ -1,5 +1,7 @@
 import hashlib
+import os
 import posixpath
+from collections.abc import Iterable
 
 from django import http
 from django.conf import settings
@@ -59,10 +61,25 @@ class FileSystemBackend(FileSystemStorage, FsBackendBase):
         self.upload_to = upload_to
         super().__init__(*args, **kwargs)
 
-    def download_url(self, instance: models.Model):
+    def download_url(self, instance: models.Model) -> str:
+        """Generate a URL for downloading a file."""
         return reverse('download_file', kwargs={
             'pk': instance.pk,
         })
+
+    def delete_many(self, names: Iterable[str]) -> dict[str, bool | Exception]:
+        results: dict[str, bool | Exception] = {}
+        for name in names:
+            path = self.path(name)
+            try:
+                os.unlink(path)
+            except FileNotFoundError:
+                results[name] = True
+            except OSError as exc:
+                results[name] = exc
+            else:
+                results[name] = True
+        return results
 
     def save_file(self, fs_node: FsNode, request: HttpRequest) -> None:
         """Save request into file."""

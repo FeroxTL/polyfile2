@@ -1,3 +1,5 @@
+import uuid
+
 import marshmallow
 from django import http
 from django.urls import reverse
@@ -5,7 +7,7 @@ from django_hint import RequestType
 
 from polyfile.apps.accounts.models import User
 from polyfile.apps.storage import schemas
-from polyfile.apps.storage.models import FsNode, TempUpload
+from polyfile.apps.storage.models import FsNode, FsNodeDeletionJob, TempUpload
 from polyfile.apps.storage.utils import (
     create_fs_node,
     get_fs_node_with_children,
@@ -41,8 +43,32 @@ class FsNodeListApiView(BaseApiView):
         except marshmallow.ValidationError as e:
             raise exceptions.FieldValidationError(detail=e.messages)
 
-        remove_fs_node(user=request.user, path=params['path'])
-        return http.HttpResponse(status=204)
+        job = remove_fs_node(user=request.user, path=params['path'])
+        return http.JsonResponse(
+            data={"job_id": str(job.pk), "status": job.status},
+            status=202,
+        )
+
+
+class FsNodeDeletionJobStatusApiView(BaseApiView):
+    @staticmethod
+    def get(request: RequestType, job_id: uuid.UUID) -> http.HttpResponse:
+        assert request.user.is_authenticated and isinstance(request.user, User)
+        try:
+            job = FsNodeDeletionJob.objects.get(pk=job_id, owner=request.user)
+        except FsNodeDeletionJob.DoesNotExist:
+            raise exceptions.NotFound("Deletion job not found")
+        return http.JsonResponse(
+            data={
+                "job_id": str(job.pk),
+                "status": job.status,
+                "total_nodes": job.total_nodes,
+                "processed_nodes": job.processed_nodes,
+                "last_error": job.last_error,
+                "created_at": job.created_at,
+                "finished_at": job.finished_at,
+            }
+        )
 
 
 class FsNodeMkdirApiView(BaseApiView):

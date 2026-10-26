@@ -19,8 +19,10 @@ from polyfile.core.exceptions import NotFound
 def download_file_view(request: HttpRequest, pk: uuid.UUID):
     """Download file. Requires authentication and ownership."""
     try:
-        fs_node: FsNode = FsNode.objects.get(type=FsNode.TypeChoices.FILE, id=pk)
+        fs_node: FsNode = FsNode.active.get(type=FsNode.TypeChoices.FILE, id=pk)
     except FsNode.DoesNotExist:
+        raise NotFound('File not found')
+    if fs_node.deleted_at is not None:
         raise NotFound('File not found')
 
     # Use the new service to handle serving and permission checks
@@ -45,6 +47,7 @@ def upload_file_view(request: HttpRequest, token: str):
             token=token,
             status=TempUpload.Status.UPLOADING,
             fs_node__file='',
+            fs_node__deleted_at__isnull=True,
         )
     except TempUpload.DoesNotExist:
         raise NotFound('Upload not found')  # TODO: specify/translate error text

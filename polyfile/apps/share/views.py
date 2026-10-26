@@ -85,13 +85,16 @@ class GetShareDetailApiView(AnonymousApiView):
     def get(self, request: http.HttpRequest, share_token: str, path: str = "") -> http.HttpResponse:
         """Retrieve the details of a public share."""
         try:
-            share = SharedNode.active.get(token=share_token)
+            share = SharedNode.active.get(token=share_token, root_fs_node__deleted_at__isnull=True)
             node_path: PurePosixPath = ensure_absolute_path(path)
             fs_node_with_children = get_fs_node_with_children(
                 user=share.owner, 
                 path=node_path,
                 parent_fs_node=share.root_fs_node,
             )
+            # TODO: we already checked parent, can skip checking child
+            if fs_node_with_children.current and getattr(fs_node_with_children.current, 'deleted_at', None) is not None:
+                raise exceptions.NotFound(f"Share with token {share_token} does not exist.")
             with SharedNodeTokenContext(share.token):
                 return http.JsonResponse(data=self.response_serializer.dump(fs_node_with_children))
         except SharedNode.DoesNotExist:
@@ -120,7 +123,9 @@ def public_share_download(
     try:
         # Find an active ShareNode
         share = SharedNode.active.get(token=share_token)
-        node = FsNode.objects.get(id=fs_node_id)
+        node = FsNode.active.get(id=fs_node_id)
+        if node.deleted_at is not None or share.root_fs_node.deleted_at is not None:
+            raise FsNode.DoesNotExist
     except (FsNode.DoesNotExist, SharedNode.DoesNotExist):
         return render(request, "share/error.html", status=404, context={
             "error_message": "This share is not active anymore.",

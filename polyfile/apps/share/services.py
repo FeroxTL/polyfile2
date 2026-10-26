@@ -148,7 +148,7 @@ def create_public_share(
         share.token = uuid.uuid4()
         share.revoked_at = None
     share.expires_at = expires_at
-    share.save(update_fields=["token", "revoked_at", "expires_at"])
+    share.save(update_fields=("token", "revoked_at", "expires_at",))
 
     return share
 
@@ -168,11 +168,11 @@ def revoke_public_share(user: User, share_token: uuid.UUID) -> SharedNode:
 
     :raises SharedNode.DoesNotExist: If no share with this token belongs to the user.
     """
-    share = SharedNode.objects.get(token=share_token, owner=user)
+    share: SharedNode = SharedNode.objects.get(token=share_token, owner=user)
 
     if share.revoked_at is None:
         share.revoked_at = timezone.now()
-        share.save(update_fields=["revoked_at"])
+        share.save(update_fields=("revoked_at",))
 
     return share
 

@@ -22,6 +22,7 @@ class ActiveShareNodeManager(models.Manager):
             .filter(
                 Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
                 revoked_at__isnull=True,
+                root_fs_node__deleted_at__isnull=True,
             )
         )
 

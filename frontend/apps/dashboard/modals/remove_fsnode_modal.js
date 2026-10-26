@@ -24,15 +24,28 @@ const getDetailFromError = (error) => {
 
 const sendRequest = (vnode) => {
   vnode.state.error = null;
+  if (!vnode.state.removeList || vnode.state.removeList.length === 0) {
+    return Promise.resolve();
+  }
 
-  return m.request(API_V1_FSNODE, {
-    method: "DELETE",
-    // TODO: really remove only first?
-    params: { path: joinPath(DashboardFsNodeList.current.path, vnode.state.removeList[0].name) },
-  }).then(() => {
+  const paths = vnode.state.removeList.map((item) =>
+    joinPath(DashboardFsNodeList.current.path, item.name),
+  );
+
+  // For MVP delete sequentially; all return 202 Accepted
+  const requests = paths.map((path) =>
+    m.request(API_V1_FSNODE, {
+      method: "DELETE",
+      params: { path },
+    }),
+  );
+
+  return Promise.allSettled(requests).then((results) => {
     closeModal(vnode.attrs.modalId);
+    // Optimistically remove all requested items
+    const toRemove = new Set(vnode.state.removeList);
     DashboardFsNodeList.elements = DashboardFsNodeList.elements.filter(
-      (item) => item !== vnode.state.removeList[0],
+      (item) => !toRemove.has(item),
     );
   }, (error) => {
     vnode.state.error = error;

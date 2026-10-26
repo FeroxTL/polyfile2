@@ -72,7 +72,7 @@ def get_user_fs_node_by_path(
 
     cte = CTE.recursive(partial(
         make_fs_node_cte,
-        base_queryset=FsNode.objects.filter(owner=user),
+        base_queryset=FsNode.active.filter(owner=user),
         parent_fs_node=parent_fs_node,
     ))
     return with_cte(
@@ -103,7 +103,7 @@ def get_user_fs_node_paths(
 
     cte = CTE.recursive(partial(
         make_fs_node_cte,
-        base_queryset=FsNode.objects.filter(owner=user),
+        base_queryset=FsNode.active.filter(owner=user),
         parent_fs_node=None,
     ))
     rows = with_cte(

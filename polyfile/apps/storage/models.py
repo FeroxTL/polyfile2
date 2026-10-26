@@ -4,6 +4,7 @@ import uuid
 from django.conf import settings
 from django.core import exceptions
 from django.db import models
+from django.db.models import Q
 from django.utils.timezone import now
 from django.utils.translation import gettext as _
 from django_hint import StandardModelType
@@ -45,6 +46,37 @@ class FsStorage(models.Model, StandardModelType['FsStorage']):
 
     def __str__(self) -> str:
         return self.name
+
+
+class FsNodeDeletionJob(models.Model, StandardModelType['FsNodeDeletionJob']):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+        TIMEOUT = "timeout", "Timeout"
+        CANCELLED = "cancelled", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    root_path = models.CharField(max_length=1024, blank=True)
+    status = models.CharField(max_length=16, choices=Status, default=Status.PENDING, db_index=True)
+    total_nodes = models.PositiveIntegerField(default=0)
+    processed_nodes = models.PositiveIntegerField(default=0)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    scheduled_at = models.DateTimeField(default=now, db_index=True)
+    locked_until = models.DateTimeField(null=True, blank=True, db_index=True)
+    locked_by = models.CharField(max_length=255, blank=True)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Node deletion job"
+        verbose_name_plural = "Node deletion jobs"
+
+    def __str__(self) -> str:
+        return f"DeletionJob {self.pk} ({self.status})"
 
 
 class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
@@ -116,6 +148,11 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
         return result
 
 
+class ActiveFsNodeManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+
 class FsNode(AbstractFsNode):
     """File or directory node."""
     id = models.UUIDField(primary_key=True, db_index=True, default=uuid.uuid4, blank=True)
@@ -161,12 +198,40 @@ class FsNode(AbstractFsNode):
         auto_now_add=True,
     )
 
+    # deleted_at + FsNodeDeletionJob is a tombstone for background cleanup, not a recycle bin
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    deletion_job = models.ForeignKey(
+        FsNodeDeletionJob,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="nodes",
+        db_index=True,
+    )
+
+    objects = models.Manager()
+    active = ActiveFsNodeManager()
+
     class Meta:
         verbose_name = "Node"
         verbose_name_plural = "Nodes"
-        unique_together: typing.ClassVar = (
-            ("name", "parent", "storage"),
-        )
+        constraints = [
+            # Unique constraint for non-root nodes: active nodes must have unique names
+            #  within the same parent and storage. Tombstones may have duplicate names.
+            models.UniqueConstraint(
+                fields=["name", "parent", "storage"],
+                condition=Q(deleted_at__isnull=True),
+                name="uniq_active_name_parent_storage",
+            ),
+            # Unique constraint for root nodes (parent is null):
+            #  active root nodes must have unique names within the same storage.
+            # Default SQL behavior (parent=NULL) allows to have duplicates.
+            models.UniqueConstraint(
+                fields=["name", "storage", "owner"],
+                condition=Q(parent__isnull=True, deleted_at__isnull=True),
+                name="uniq_active_root_name_storage",
+            ),
+        ]
 
     get_type_display: typing.Callable
 

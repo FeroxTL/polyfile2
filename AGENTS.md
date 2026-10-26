@@ -31,7 +31,7 @@ To ensure cross-platform compatibility (Windows, macOS, Linux, and Cloud Storage
 - **Frontend Testing**: Vitest.
 - **Build Tool**: Webpack.
 - **Database**: SQLite (development), PostgreSQL (production).
-- **API Location**: Main API views are located in `polyfile/core/rest`.
+- **API Location**: Main file management APIs are in `polyfile/apps/storage/api.py`; generic API components are in `polyfile/core/rest`.
 
 ## 5. Development Standards
 - **Testing**:
@@ -81,3 +81,6 @@ To ensure cross-platform compatibility (Windows, macOS, Linux, and Cloud Storage
   - *Incorrect:* `export default FsNodeEmptyDirectoryView;`
 - This ensures consistent naming across the application and improves IDE auto-import support and refactoring.
 - **Linting**: For all frontend changes, ensure code complies with ESLint rules. Run `npx eslint .` within the `frontend/` directory to check for errors before finalizing work.
+
+## Architecture & Context
+The `LLMs.md` file serves as the primary reference for project architecture, core specifications, and key implementation details. Agents should consult `LLMs.md` before starting new tasks to ensure alignment with the project's design and to respect established constraints.

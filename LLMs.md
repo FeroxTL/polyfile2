@@ -21,13 +21,22 @@ Polyfile is a system for managing and sharing files using a signed token mechani
 - `docs/implementation_plan_signed_tokens.md`: Primary source of truth for current goals.
 
 ## Current State & Goals
-- Transitioning to signed tokens for public share downloads.
-- Distinguishing between the `polyfile` and `polyfile2` directories (migration/versioning in progress).
+- **Signed Tokens**: Fully implemented for public share downloads. Uses HMAC-SHA256 and Base36 encoding.
+- **Recursive Deletion**: Asynchronous background deletion system implemented using `FsNodeDeletionJob`.
+- **Structure**: Distinction between `polyfile` and `polyfile2` is maintained for versioning/migration.
 
 ## Coding Standards & Constraints
 - Maintain the separation between `storage` and `share` logic.
 - Respect the cryptographic implementation of the signed tokens.
 - Be aware of the `polyfile` vs `polyfile2` structure.
+
+## Recursive Directory Deletion
+The system supports asynchronous recursive directory deletion.
+- **Mechanism**: Uses `FsNodeDeletionJob` to manage background deletion tasks. `FsNode` entities include `deleted_at` (timestamp) and `deletion_job` (foreign key) fields.
+- **API Behavior**: `DELETE` requests for paths return `202 Accepted` immediately. Nodes are marked as deleted in a transaction; physical removal happens in the background.
+- **Background Worker**: A management command `run_deletion_worker` processes deletions in batches using a leaf-first strategy (files before directories).
+- **Storage Backends**: `FsBackendBase` includes a `delete_many` method to support efficient bulk deletions.
+- **Constraints**: Implements partial unique constraints on `FsNode` to allow "tombstones" (deleted nodes) while preserving uniqueness for active nodes.
 
 ## Agent Handoff Context
 - Previous work established the architectural pillars (Storage Service, Signed Tokens).

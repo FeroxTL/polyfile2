@@ -8,11 +8,14 @@ from pathlib import PurePosixPath
 import magic
 import marshmallow
 from django.core.files import File
-from django.db import models
+from django.db import models, transaction
+from django.utils.timezone import now
+from django_cte import CTE, with_cte
 
 from polyfile.apps.accounts.models import User
+from polyfile.apps.share.models import SharedNode
 from polyfile.apps.storage.managers import get_user_fs_node_by_path
-from polyfile.apps.storage.models import FsNode
+from polyfile.apps.storage.models import FsNode, FsNodeDeletionJob, TempUpload
 from polyfile.apps.storage.schemas import get_fs_node_name_validator
 from polyfile.core import exceptions
 
@@ -79,13 +82,13 @@ def get_fs_node_with_children(
         )
         fs_node.path = '/'
         # Return all root nodes
-        fs_node_children = FsNode.objects.filter(owner=user, parent__isnull=True)
+        fs_node_children = FsNode.active.filter(owner=user, parent__isnull=True)
     elif fs_node.is_file:
         # File node can not have child nodes, so make them empty
-        fs_node_children = FsNode.objects.none()
+        fs_node_children = FsNode.active.none()
     else:
         assert fs_node.is_directory
-        fs_node_children = FsNode.objects.filter(owner=user, parent=fs_node)
+        fs_node_children = FsNode.active.filter(owner=user, parent=fs_node)
 
     fs_node_children = fs_node_children.select_related("share").annotate(
         sort_priority=models.Case(
@@ -127,9 +130,9 @@ def create_fs_node(
         raise exceptions.InvalidFsNodeName(detail=', '.join(e.messages))
 
     if parent_path == PurePosixPath('/'):
-        base_qs, parent_fs_node = FsNode.objects.all(), None
+        base_qs, parent_fs_node = FsNode.active.all(), None
     else:
-        base_qs = FsNode.objects.filter(parent__type=FsNode.TypeChoices.DIRECTORY)
+        base_qs = FsNode.active.filter(parent__type=FsNode.TypeChoices.DIRECTORY)
         try:
             parent_fs_node = get_user_fs_node_by_path(user=user, path=parent_path)
         except FsNode.DoesNotExist:
@@ -152,15 +155,12 @@ def create_fs_node(
     return fs_node
 
 
-def remove_fs_node(user: User, path: pathlib.PurePosixPath) -> None:
+def remove_fs_node(user: User, path: pathlib.PurePosixPath) -> FsNodeDeletionJob:
     """
     Remove FsNode (file/directory) by path.
 
-    Directory must be empty.
-
-    :param user: directory owner.
-    :param path: target path with FSNode name included.
-    :raises HttpException: most of the errors.
+    Uses asynchronous deletion: marks subtree as deleted (tombstone) and schedules
+    a background job for physical removal.
     """
     try:
         fs_node: FsNode | None = get_user_fs_node_by_path(user=user, path=path)
@@ -171,19 +171,37 @@ def remove_fs_node(user: User, path: pathlib.PurePosixPath) -> None:
             detail=f'Can not access "{path}" - no such file or directory',
         )
 
-    if fs_node.is_file:
-        # Remove FsNode(type=file)
-        return fs_node.delete()
+    with transaction.atomic():
+        job = FsNodeDeletionJob.objects.create(
+            owner=user,
+            root_path=str(path),
+            status=FsNodeDeletionJob.Status.PENDING,
+        )
 
-    assert fs_node.is_directory
-    if not FsNode.objects.filter(owner=user, parent=fs_node).exists():
-        # TODO: remove query, use try..except
-        # No descendants, can be removed safely
-        return fs_node.delete()
+        # Get all descendants via CTE-like approach using recursion
+        cte = CTE.recursive(
+            lambda cte: FsNode.active.filter(pk=fs_node.pk, owner=user, deleted_at__isnull=True)
+            .values("pk")
+            .union(
+                cte.join(FsNode, parent_id=cte.col.pk).values("pk"),
+                all=True,
+            )
+        )
+        rows = with_cte(cte, select=cte.join(FsNode, pk=cte.col.pk).values("pk"))
+        subtree_ids = [row["pk"] for row in rows]
 
-    # TODO: implement background deletions
-    #  try:
-    #    fs_node.delete()
-    #  except OperationalError: # has descendants
-    #    return DeletionPlan()
-    raise exceptions.HttpException(detail='Not implemented yet')
+        if subtree_ids:
+            FsNode.objects.filter(pk__in=subtree_ids).update(
+                deleted_at=now(),
+                deletion_job=job,
+            )
+            # Revoke shares
+            SharedNode.objects.filter(root_fs_node_id__in=subtree_ids, revoked_at__isnull=True).update(
+                revoked_at=now(),
+            )
+            # Cancel temp uploads
+            TempUpload.objects.filter(fs_node_id__in=subtree_ids).delete()
+
+        job.total_nodes = len(subtree_ids)
+        job.save(update_fields=("total_nodes",))
+        return job
