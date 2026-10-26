@@ -1,11 +1,12 @@
 from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import URLPattern, URLResolver, include, path, reverse_lazy
 from django.views.generic import RedirectView
 
 from polyfile.apps.storage.views import download_file_view, upload_file_view
 from polyfile.core import api
-from polyfile.core.views import fs_node_browse_view
+from polyfile.core.views import fs_node_browse_view, serve_docs
 
 # APIs
 api_patterns = [
@@ -35,7 +36,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("", include("polyfile.apps.share.urls")),
     path("", include(api_patterns)),
     path("", include(public_page_patterns)),
-]
+] + static('/docs/', document_root=settings.BASE_DIR / 'docs', view=serve_docs)
 
 if settings.DEBUG_TOOLBAR_ENABLED:
     from debug_toolbar.toolbar import debug_toolbar_urls

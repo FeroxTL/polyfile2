@@ -16,6 +16,9 @@ ruff-format:
 ruff-format-fix:
 	@ruff format .
 
+build-docs:
+	mkdocs build --config-file ./docs/mkdocs.yml
+
 coverage:
 	@coverage erase
 	@coverage run $(manage) test --noinput --failfast

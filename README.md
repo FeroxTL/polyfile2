@@ -42,8 +42,8 @@ and integrates seamlessly with Django’s built-in authentication system.
   - SPA
     - [x] Handle correct order when FsNode created / renamed
     - [x] Simple file viewer (at least images)
-    - [ ] Shared access / public download
-    - [ ] Remove nested directories (async?)
+    - [x] Shared access / public download
+    - [x] Remove nested directories
     - [ ] Upload queue
   - User authentication
     - [ ] Ban by ip address for incorrect password

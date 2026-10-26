@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BASE_DIR.parent
 
 env = environ.Env(
-    DEBUG=(bool, True),
+    DEBUG=(bool, 'runserver' in sys.argv),
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
     INTERNAL_IPS=(list, ['127.0.0.1']),
 )
@@ -20,9 +20,9 @@ environ.Env.read_env(Path.cwd() / '.env')
 SECRET_KEY = env.str('SECRET_KEY', 'django-insecure-o_d=g9_#sofs^h8p34x5!$$gkdlqtk_2@-#0kw%gx2off@13&!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool('DEBUG', 'runserver' in sys.argv)
+DEBUG = env.bool('DEBUG')
 TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
-ALLOWED_HOSTS = ['192.168.2.202', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
 LOGIN_URL = reverse_lazy('accounts-login')
 
@@ -48,11 +48,12 @@ INSTALLED_APPS = [
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'core' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'django.template.context_processors.debug',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -77,10 +78,10 @@ WSGI_APPLICATION = 'polyfile.core.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db_url(
+        'DATABASE_URL',
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'
+    )
 }
 
 

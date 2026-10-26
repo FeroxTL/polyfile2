@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+
+
+{% block welcome-msg %}
+{{ block.super }}
+{% if debug %}
+<a href="/docs/">Docs</a> / {%endif%}
+{% endblock %}

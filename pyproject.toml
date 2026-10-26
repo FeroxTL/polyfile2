@@ -7,8 +7,8 @@ requires-python = ">=3.11"
 dependencies = [
     "django==5.2.18",
     "django-cte==3.0.0",
-    "django-environ>=0.14.0",
-    "django-hint>=0.3.2",
+    "django-environ==0.14.0",
+    "django-hint==0.3.2",
     "django-webpack-loader==3.2.4",
     "marshmallow==4.3.1",
     "python-magic==0.4.27; sys_platform == 'linux'",
@@ -24,8 +24,9 @@ lint.ignore = [
 
 [dependency-groups]
 dev = [
-    "coverage>=7.16.2",
+    "coverage==7.16.2",
     "django-debug-toolbar==8.0.0",
-    "factory-boy>=3.3.3",
-    "ruff>=0.17.0",
+    "factory-boy==3.3.3",
+    "mkdocs==1.6.1",
+    "ruff==0.17.0",
 ]

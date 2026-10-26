@@ -1,0 +1,23 @@
+site_name: Polyfile
+site_dir: ../polyfile/docs
+nav:
+  - Home: index.md
+  - System Core & Design:
+      - Architecture overview: system_core/architecture_overview.md
+      - Frontend architecture: system_core/frontend_architecture.md
+      - Models & data model: system_core/models_data_model.md
+      - Storage backends: system_core/storage_backends.md
+      - Security: system_core/security.md
+      - Authentication & accounts: system_core/authentication_accounts.md
+      - Sharing & signed tokens: system_core/sharing_signed_tokens.md
+      - Recursive deletion/background jobs: system_core/recursive_deletion_background_jobs.md
+  - Operations & Integration:
+      - Installation & configuration: operations/installation.md
+      - Configuration for deployment: operations/configuration_for_deployment.md
+      - Environment variables: operations/environment_variables.md
+      - API reference: operations/api_reference.md
+  - Contributor's Guide:
+      - Roadmap: contributors/roadmap.md
+      - Development workflow: contributors/development_workflow.md
+      - Testing: contributors/testing.md
+      - Contributing: contributors/contributing.md
