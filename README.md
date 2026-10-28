@@ -20,75 +20,62 @@ and integrates seamlessly with Django’s built-in authentication system.
 - **Custom Storage Backends**: Supports various storage solutions, including local path-based storage.
 - **File Management API**: RESTful endpoints for uploading, listing, and managing files.
 
+## Installation
+
+### From source (development)
+
+```bash
+uv sync
+cd frontend
+npm install
+npm run build_dev
+# or `npm run watch`
+cd ..
+```
+
+Create a `.env` file, then run:
+
+```bash
+uv run python manage.py migrate
+uv run python manage.py runserver
+
+# in a second terminal — runserver does not start this worker
+uv run python manage.py run_deletion_worker
+```
+
+Recursive deletion is handled by the background worker. Without it, deletion jobs are accepted but stay pending.
+
+### From a wheel
+
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+
+uv run mkdocs build --strict --config-file ./docs/mkdocs.yml
+uv run python -m build   # or: uv build
+uv venv .venv
+uv pip install dist/polyfile-0.1.0-py3-none-any.whl
+POLYFILE_DATA_DIR=./data .venv/bin/polyfile migrate
+POLYFILE_DATA_DIR=./data .venv/bin/polyfile runserver  # development only!
+
+# in a second terminal — runserver does not start this worker
+POLYFILE_DATA_DIR=./data .venv/bin/polyfile run_deletion_worker
+```
+
+The wheel includes the production frontend assets and the pre-built HTML documentation and
+does not require Node.js or MkDocs. Runtime data (SQLite database, collected static files,
+media) is stored in `POLYFILE_DATA_DIR` (the current directory by default).
+
+See the [documentation](docs/docs/index.md) for configuration, deployment, and packaging
+details.
+
 ## Roadmap
-- 0.1.0 (done)
-  - [x] Support of at least one `FsStorage` backend (file system)
-  - SPA (web):
-    - [x] List files and directories
-    - [x] Create directories
-    - [x] Upload files
-    - Submenu:
-      - [x] Download files
-      - [x] Remove single files / empty directories
-    - [x] Basic file type icons (file and directory)
-  - Admin interface (django)
-    - [x] Manage users
-    - [x] Manage storages, files and directories
-  - User authentication
-    - [x] Public auth form (not admin)
 
+The roadmap and current status are maintained in the documentation:
+[docs/docs/contributors/roadmap.md](docs/docs/contributors/roadmap.md).
 
-- 0.2.0
-  - SPA
-    - [x] Handle correct order when FsNode created / renamed
-    - [x] Simple file viewer (at least images)
-    - [x] Shared access / public download
-    - [x] Remove nested directories
-    - [ ] Upload queue
-  - User authentication
-    - [ ] Ban by ip address for incorrect password
-    - [ ] Password reset
-    - [x] Logout from SPA
-  - Admin
-    - [x] Storage settings with forms
+The README intentionally does not duplicate it, so there is a single source of truth for
+what is planned and what has already shipped.
 
-
-- x.x (Just plans, not exact version)
-  - Internalization 
-  - SPA
-    - JavaScript prettify and code style
-    - Right click menu support
-    - Image viewer - zoom to cursor
-  - Initial setup on first run
-    - Create and log in superuser
-    - Create and setup first `FsStorage`
-    - Create non-empty default profile
-  - Authentication
-    - Custom auth mechanism (like oauth2)
-  - Api and backend
-    - User settings
-    - Space limitations
-      - Space used in SPA
-      - Limit space per user / per storage / per group
-    - Toasts (i.e. "directory created", "settings saved")
-    - Continuous session (renew with each request, needs caching?)
-    - Access tokens (to use in other applications)
-      - Token permissions (CRUD + restrict for file/directory)
-    - Image previews
-    - Download directories (zip files)
-    - Add Photos and Albums
-    - Shared access between users
-    - Public uploads
-    - Trash bin
-  - Background tasks
-    - Storage migration
-    - Sending email
-    - Clear trash bin with interval
-  - Storages
-    - Support more storages (like `s3`, see `django-storages`)
-    - New type: Proxy storage (`fsnode` not created, all info about structure retrieves from storage itself)
-    - Search for files or content
-  - Plugin system
-  - Native application
-    - Sync application for computers
-    - Sync application for phones

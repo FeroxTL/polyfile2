@@ -1,9 +1,10 @@
 # Roadmap
 
-From README.md:
+This page is the single source of truth for the project status and planned work. The
+README links here instead of keeping its own copy of the roadmap.
 
 ## Current status
-Proof-of-works. Nothing works stable, use at your own risk.
+Early-stage proof of work. Nothing is stable yet; use at your own risk.
 
 ## 0.1.0 (done)
 - [x] Support of at least one `FsStorage` backend (file system)
@@ -21,12 +22,12 @@ Proof-of-works. Nothing works stable, use at your own risk.
 - User authentication:
   - [x] Public auth form (not admin)
 
-## 0.2.0
+## 0.2.0 (in progress)
 - SPA:
   - [x] Handle correct order when FsNode created / renamed
   - [x] Simple file viewer (at least images)
-  - [ ] Shared access / public download
-  - [ ] Remove nested directories (async?) - **Implemented** via background worker
+  - [x] Shared access / public download
+  - [x] Remove nested directories via background worker
   - [ ] Upload queue
 - User authentication:
   - [ ] Ban by ip address for incorrect password

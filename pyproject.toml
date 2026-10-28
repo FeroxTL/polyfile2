@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
 [project]
 name = "polyfile"
 version = "0.1.0"
@@ -11,8 +15,52 @@ dependencies = [
     "django-hint==0.3.2",
     "django-webpack-loader==3.2.4",
     "marshmallow==4.3.1",
-    "python-magic==0.4.27; sys_platform == 'linux'",
+    "python-magic==0.4.27; sys_platform != 'win32'",
     "python-magic-bin==0.4.14 ; sys_platform == 'win32'",
+]
+classifiers = [
+    "Framework :: Django",
+    "Framework :: Django :: 5.2",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2"]
+
+[project.scripts]
+polyfile = "polyfile.__main__:main"
+
+[tool.hatch.build]
+artifacts = [
+    "polyfile/docs/**",
+    "polyfile/web_assets/**",
+    "polyfile/webpack-stats.json",
+]
+exclude = [
+    "**/__pycache__/**",
+    "**/*.py[cod]",
+    "polyfile/db.sqlite3",
+    "polyfile/docs/.gitignore",
+    "frontend/node_modules/**",
+    "frontend/coverage/**",
+    "uv.lock",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["polyfile"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "polyfile",
+    "frontend",
+    "README.md",
+    "pyproject.toml",
+    "Makefile",
+    "hatch_build.py",
 ]
 
 
@@ -24,9 +72,11 @@ lint.ignore = [
 
 [dependency-groups]
 dev = [
+    "build",
     "coverage==7.16.2",
     "django-debug-toolbar==8.0.0",
     "factory-boy==3.3.3",
     "mkdocs==1.6.1",
     "ruff==0.17.0",
+    "twine",
 ]

@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -14,7 +15,16 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
     INTERNAL_IPS=(list, ['127.0.0.1']),
 )
-environ.Env.read_env(Path.cwd() / '.env')
+ENV_FILE = Path(os.environ.get("POLYFILE_ENV_FILE", Path.cwd() / ".env")).expanduser()
+environ.Env.read_env(ENV_FILE)
+
+# Runtime data (database, collected static, media) must not live inside the package:
+# a wheel is installed into site-packages, which may be read-only and is replaced on upgrade.
+DATA_DIR = Path(env.str("POLYFILE_DATA_DIR", str(Path.cwd()))).expanduser().resolve()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# MkDocs output is built into the package and shipped with distributions.
+DOCS_DIR = BASE_DIR / "docs"
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env.str('SECRET_KEY', 'django-insecure-o_d=g9_#sofs^h8p34x5!$$gkdlqtk_2@-#0kw%gx2off@13&!')
@@ -80,18 +90,36 @@ WSGI_APPLICATION = 'polyfile.core.wsgi.application'
 DATABASES = {
     'default': env.db_url(
         'DATABASE_URL',
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'
+        default=f'sqlite:///{DATA_DIR / "db.sqlite3"}'
     )
 }
 
 
 # Webpack loader
+# Prefer development assets only when they exist; otherwise fall back to the production
+# bundle shipped with the package. This works both in a source checkout and in a wheel.
+DEV_WEBPACK_STATS_FILE = ROOT_DIR / 'webpack-dev-stats.json'
+DEV_WEBPACK_ASSETS_DIR = ROOT_DIR / 'web_dev_assets'
+PROD_WEBPACK_STATS_FILE = BASE_DIR / 'webpack-stats.json'
+PROD_WEBPACK_ASSETS_DIR = BASE_DIR / 'web_assets'
+
+DEFAULT_WEBPACK_STATS_FILE = (
+    DEV_WEBPACK_STATS_FILE
+    if DEBUG and DEV_WEBPACK_STATS_FILE.exists()
+    else PROD_WEBPACK_STATS_FILE
+)
+DEFAULT_WEBPACK_ASSETS_DIR = (
+    DEV_WEBPACK_ASSETS_DIR
+    if DEBUG and DEV_WEBPACK_ASSETS_DIR.exists()
+    else PROD_WEBPACK_ASSETS_DIR
+)
+
 WEBPACK_LOADER = {
     'DEFAULT': {
         'BUNDLE_DIR_NAME': 'bundles/',
         'STATS_FILE': env.str(
             'WEBPACK_STATS_FILE',
-            str(ROOT_DIR / 'webpack-dev-stats.json' if DEBUG else BASE_DIR / 'webpack-stats.json'),
+            str(DEFAULT_WEBPACK_STATS_FILE),
         ),
         'POLL_INTERVAL': 0.3,
         'IGNORE': [r'.+\.hot-update.js', r'.+\.map'],
@@ -100,7 +128,7 @@ WEBPACK_LOADER = {
 }
 WEBPACK_ASSETS_DIR = env.str(
     'WEBPACK_ASSETS_DIR',
-    str(ROOT_DIR / 'web_dev_assets' if DEBUG else BASE_DIR / 'web_assets'),
+    str(DEFAULT_WEBPACK_ASSETS_DIR),
 )
 
 
@@ -135,9 +163,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'core' / 'static'
+STATIC_ROOT = Path(env.str('STATIC_ROOT', str(DATA_DIR / 'static')))
 
 # Media files
+MEDIA_URL = 'media/'
+MEDIA_ROOT = Path(env.str('MEDIA_ROOT', str(DATA_DIR / 'media')))
 STORAGES = {
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
@@ -146,9 +176,8 @@ STORAGES = {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
-MEDIA_URL = 'media/'
-STATICFILES_DIRS = (
-    WEBPACK_ASSETS_DIR,
+STATICFILES_DIRS = tuple(
+    path for path in (WEBPACK_ASSETS_DIR,) if Path(path).exists()
 )
 
 # Default primary key field type
@@ -157,7 +186,10 @@ STATICFILES_DIRS = (
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Debug toolbar
-DEBUG_TOOLBAR_ENABLED = env.bool('DEBUG_TOOLBAR_ENABLED', DEBUG)
+DEBUG_TOOLBAR_ENABLED = env.bool(
+    'DEBUG_TOOLBAR_ENABLED',
+    DEBUG and importlib.util.find_spec("debug_toolbar") is not None,
+)
 if DEBUG_TOOLBAR_ENABLED:
     INSTALLED_APPS.append('debug_toolbar')
     MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')

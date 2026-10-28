@@ -40,6 +40,12 @@ To ensure cross-platform compatibility (Windows, macOS, Linux, and Cloud Storage
     - Use `factory-boy` for dynamic fixture creation.
     - Use file-based fixtures for large, static datasets where appropriate.
     - **Mandatory**: Every new feature must include tests. Existing tests must be updated/fixed when code changes.
+- **Packaging**:
+    - The build backend is `hatchling` (PEP 517); `python -m build` and `uv build` are equivalent frontends.
+    - Run the production frontend build (`npm run build` in `frontend/`) and the docs build (`mkdocs build --strict`) before `python -m build`; a build hook rejects artifacts without `polyfile/web_assets/`, `polyfile/webpack-stats.json`, or `polyfile/docs/index.html`.
+    - Built docs are distributed inside `polyfile/docs/`; the Markdown sources in `docs/` are not packaged.
+    - `make assets`, `make dist`, and `make dist-check` are the canonical commands.
+    - Runtime data (database, collected static, media) must go to `POLYFILE_DATA_DIR`, never into the installed package.
 - **Coverage**:
     - **Backend**: Run `coverage run manage.py test` to ensure high test coverage.
     - **Frontend**: Run `npm run test:coverage` to ensure high test coverage.

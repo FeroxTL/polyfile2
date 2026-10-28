@@ -1,26 +1,26 @@
-Polyfile frontend module
+# Polyfile frontend
 
-Setup:
+## Setup
 
-```shell
+```bash
 npm install --include=dev
 ```
 
-Run:
+## Builds
 
-development:
+Development (output: `../web_dev_assets/`, stats: `../webpack-dev-stats.json`):
 
-```shell
+```bash
 npm run build_dev
-```
-
-development with tracking changes:
-
-```shell
+# or
 npm run watch
 ```
 
-production ready:
-```shell
+Production (output: `../polyfile/web_assets/`, stats: `../polyfile/webpack-stats.json`):
+
+```bash
 npm run build
 ```
+
+Production assets are required before building the Python package. Development assets are
+kept locally and are not part of the distribution.

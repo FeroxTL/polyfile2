@@ -32,6 +32,9 @@ For detailed fields and behavior, see [Models & data model](models_data_model.md
 
 Management command: `python manage.py run_deletion_worker` (in `apps.storage.management.commands.run_deletion_worker`).
 
+The worker is a separate process. The Django development server (`runserver`) and the application server do not
+start it, so it must be run alongside them in every environment; otherwise deletion jobs remain pending.
+
 ### Key features
 - **Leaf-first deletion**: Files are deleted before directories to ensure directories become empty before removal.
 - **Batch processing**: Processes nodes in configurable batches for efficiency and memory control.

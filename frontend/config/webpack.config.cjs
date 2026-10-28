@@ -11,9 +11,14 @@ const srcDir = path.resolve(rootDir, "src");
 module.exports = (env, argv) => {
   const isProduction = argv.mode === "production";
 
-  let bundleStatsFile = path.resolve("../webpack-dev-stats.json");
+  let bundleStatsFile = path.resolve(rootDir, "..", "webpack-dev-stats.json");
   if (isProduction) {
-    bundleStatsFile = path.resolve("../webpack-dev-stats.json");
+    bundleStatsFile = path.resolve(
+      rootDir,
+      "..",
+      "polyfile",
+      "webpack-stats.json",
+    );
   }
 
   return {

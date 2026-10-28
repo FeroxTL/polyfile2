@@ -1,5 +1,6 @@
 site_name: Polyfile
 site_dir: ../polyfile/docs
+strict: true
 nav:
   - Home: index.md
   - System Core & Design:
@@ -13,6 +14,7 @@ nav:
       - Recursive deletion/background jobs: system_core/recursive_deletion_background_jobs.md
   - Operations & Integration:
       - Installation & configuration: operations/installation.md
+      - Building a distribution: operations/packaging.md
       - Configuration for deployment: operations/configuration_for_deployment.md
       - Environment variables: operations/environment_variables.md
       - API reference: operations/api_reference.md

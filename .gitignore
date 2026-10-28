@@ -21,9 +21,15 @@ coverage/
 
 # build
 dist
+build
+*.egg-info/
 webpack-dev-stats.json
-web_dev_assets/
-polyfile/web_assets
+webpack-stats.json
+/web_dev_assets/
+/polyfile/web_assets
+/polyfile/webpack-stats.json
+/polyfile/docs/
+/static/
 
 # Project
 .env

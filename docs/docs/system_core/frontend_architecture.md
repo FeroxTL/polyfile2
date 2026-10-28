@@ -36,7 +36,10 @@ Webpack is configured in `frontend/config/webpack.config.cjs` with:
 ### Build outputs
 
 - **Development**: `web_dev_assets/bundles/` (used when `DEBUG=True`, stats file `webpack-dev-stats.json`)
-- **Production**: `polyfile/web_assets/bundles/` (used when `DEBUG=False`, stats file `webpack-stats.json`)
+- **Production**: `polyfile/web_assets/bundles/` (used when `DEBUG=False`, stats file `polyfile/webpack-stats.json`)
+
+Production assets are part of the Python package; see
+[Building a distribution](../operations/packaging.md).
 
 ### NPM scripts
 

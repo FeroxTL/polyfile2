@@ -36,7 +36,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("", include("polyfile.apps.share.urls")),
     path("", include(api_patterns)),
     path("", include(public_page_patterns)),
-] + static('/docs/', document_root=settings.BASE_DIR / 'docs', view=serve_docs)
+] + static('/docs/', document_root=settings.DOCS_DIR, view=serve_docs)
 
 if settings.DEBUG_TOOLBAR_ENABLED:
     from debug_toolbar.toolbar import debug_toolbar_urls

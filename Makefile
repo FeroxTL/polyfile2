@@ -17,7 +17,16 @@ ruff-format-fix:
 	@ruff format .
 
 build-docs:
-	mkdocs build --config-file ./docs/mkdocs.yml
+	uv run mkdocs build --strict --config-file ./docs/mkdocs.yml
+
+assets:
+	cd frontend && npm ci && npm run build
+
+dist: assets build-docs
+	uv run python -m build
+
+dist-check:
+	uv run twine check dist/*
 
 coverage:
 	@coverage erase

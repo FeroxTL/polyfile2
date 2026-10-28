@@ -29,7 +29,7 @@ python manage.py test --noinput --failfast
 # or via Makefile
 make test
 
-# Run deletion worker
+# Run deletion worker (separate process; runserver does not start it)
 uv run python manage.py run_deletion_worker
 ```
 
@@ -80,11 +80,30 @@ make ruff-format-fix
 
 ### Documentation
 ```bash
-# Build docs
+# Build docs (strict mode fails on broken links)
 make build-docs
 # or
-uv run mkdocs build --config-file ./docs/mkdocs.yml
+uv run mkdocs build --strict --config-file ./docs/mkdocs.yml
 ```
+
+### Packaging
+```bash
+# Build production frontend assets (output: polyfile/web_assets/)
+make assets
+
+# Build HTML documentation (output: polyfile/docs/)
+make build-docs
+
+# Build sdist and wheel (output: dist/)
+make dist
+# or
+uv run python -m build
+
+# Validate distribution metadata
+make dist-check
+```
+
+See [Building a distribution](../operations/packaging.md) for details.
 
 ### Coverage
 ```bash
