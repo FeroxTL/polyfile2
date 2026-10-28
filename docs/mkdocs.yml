@@ -18,8 +18,12 @@ nav:
       - Configuration for deployment: operations/configuration_for_deployment.md
       - Environment variables: operations/environment_variables.md
       - API reference: operations/api_reference.md
+  - Roadmap: contributors/roadmap.md
+  - Release notes:
+      - Overview: releases/index.md
+      - 0.2.0 (unreleased): releases/next.md
+      - 0.1.0: releases/0.1.0.md
   - Contributor's Guide:
-      - Roadmap: contributors/roadmap.md
       - Development workflow: contributors/development_workflow.md
       - Testing: contributors/testing.md
       - Contributing: contributors/contributing.md

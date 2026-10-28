@@ -3,16 +3,17 @@
 Polyfile is a Django-based project designed to provide flexible file storage solutions with support for user accounts.
 It offers modular architecture for integrating various storage backends and managing files efficiently.
 
-# Current status
+## Current status
 
-Proof-of-works. Nothing works stable, use at your own risk.
+Early-stage proof of work. Nothing is stable yet; use at your own risk. See the
+[Roadmap](docs/docs/contributors/roadmap.md) for what is planned.
 
 ## Overview
 
 Polyfile combines Django's robust framework with customizable storage capabilities,
 allowing users to manage their files through both web interfaces and RESTful APIs.
-The application supports multiple storage backends (e.g., local file system and S3)
-and integrates seamlessly with Django’s built-in authentication system.
+It currently ships a local filesystem backend and is designed for additional backends
+such as S3, and it integrates with Django's built-in authentication system.
 
 ## Features
 
@@ -71,11 +72,22 @@ media) is stored in `POLYFILE_DATA_DIR` (the current directory by default).
 See the [documentation](docs/docs/index.md) for configuration, deployment, and packaging
 details.
 
-## Roadmap
+## Roadmap and release notes
 
-The roadmap and current status are maintained in the documentation:
-[docs/docs/contributors/roadmap.md](docs/docs/contributors/roadmap.md).
+- [Roadmap](docs/docs/contributors/roadmap.md) — what is planned, including the next release.
+- [Release notes](docs/docs/releases/index.md) — the only history of changes, including the current release journal.
 
-The README intentionally does not duplicate it, so there is a single source of truth for
-what is planned and what has already shipped.
+### How to keep them up to date
+
+- **Roadmap:** add only future work. Keep the next release short and move items out as soon
+  as they ship. Do not keep lists of released versions here.
+- **Release journal:** while working, add every user-visible change to
+  `docs/docs/releases/next.md` under `Added`, `Changed`, `Fixed` or `Security`. Keep the
+  highlights and upgrade notes current as you go.
+- **At release:** rename `next.md` to `<version>.md`, set its status and date, finalize the
+  upgrade notes, add the version to `docs/docs/releases/index.md` and `docs/mkdocs.yml`,
+  create a fresh `next.md`, and update links to point at the new version page. Remove
+  shipped items from the roadmap, bump the version in `pyproject.toml`, tag the release, and
+  publish the same notes as a GitHub Release.
+- Do not copy the roadmap or release history into the README — link to the single source.
 

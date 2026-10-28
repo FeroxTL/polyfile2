@@ -103,15 +103,16 @@ files. The full sequence, including the wheel-based installation, is in
 - [Configuration for deployment](operations/configuration_for_deployment.md) — production checklist.
 - [Environment variables](operations/environment_variables.md) — every supported setting.
 - [Building a distribution](operations/packaging.md) — wheel, frontend assets and bundled documentation.
+- [Release notes](releases/index.md) — what changed in each version, plus the current release journal.
 
 ### Contributing
 - [Development workflow](contributors/development_workflow.md) — commands, linting and project conventions.
 - [Testing](contributors/testing.md) — backend and frontend test suites.
-- [Roadmap](contributors/roadmap.md) — what is done, what is next, and what is only planned.
+- [Roadmap](contributors/roadmap.md) — what is next and what is only planned.
 
 ## Project status
 
-Polyfile is at an early stage. Version `0.1.0` established the core file tree and web UI; `0.2.0` added public
-sharing, signed download tokens and asynchronous recursive deletion. Expect rough edges and changing APIs — see
-the [Roadmap](contributors/roadmap.md) for the current state. Planned work includes additional storage providers,
-space limits, a trash bin, access tokens with per-node permissions, and a plugin system.
+Polyfile is at an early stage. Version `0.1.0` established the core file tree and web UI; the upcoming `0.2.0`
+adds public sharing, signed download tokens and asynchronous recursive deletion. Expect rough edges and changing
+APIs — see the [Release notes](releases/index.md) for what has shipped and the
+[Roadmap](contributors/roadmap.md) for what comes next.

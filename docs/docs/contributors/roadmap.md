@@ -1,74 +1,62 @@
 # Roadmap
 
-This page is the single source of truth for the project status and planned work. The
-README links here instead of keeping its own copy of the roadmap.
+This page is the single source of truth for planned work. It only looks forward: shipped
+changes are recorded in [Release notes](../releases/index.md).
 
 ## Current status
-Early-stage proof of work. Nothing is stable yet; use at your own risk.
 
-## 0.1.0 (done)
-- [x] Support of at least one `FsStorage` backend (file system)
-- SPA (web):
-  - [x] List files and directories
-  - [x] Create directories
-  - [x] Upload files
-  - Submenu:
-    - [x] Download files
-    - [x] Remove single files / empty directories
-  - [x] Basic file type icons (file and directory)
-- Admin interface (django):
-  - [x] Manage users
-  - [x] Manage storages, files and directories
-- User authentication:
-  - [x] Public auth form (not admin)
+Early-stage proof of work. APIs, storage layout and configuration may change without
+notice. Do not use Polyfile as the only copy of important data.
 
-## 0.2.0 (in progress)
-- SPA:
-  - [x] Handle correct order when FsNode created / renamed
-  - [x] Simple file viewer (at least images)
-  - [x] Shared access / public download
-  - [x] Remove nested directories via background worker
-  - [ ] Upload queue
-- User authentication:
-  - [ ] Ban by ip address for incorrect password
-  - [ ] Password reset
-  - [x] Logout from SPA
-- Admin:
-  - [x] Storage settings with forms
+## Next release — 0.2.0
 
-## Future plans (x.x)
-- Internalization
-- SPA:
-  - JavaScript prettify and code style
-  - Right click menu support
-  - Image viewer - zoom to cursor
-- Initial setup on first run:
-  - Create and log in superuser
-  - Create and setup first `FsStorage`
-  - Create non-empty default profile
-- Authentication:
-  - Custom auth mechanism (like oauth2)
-- API and backend:
-  - User settings
-  - Space limitations (per user/per storage/per group, show used space)
-  - Toasts (notifications)
-  - Continuous session (renew with each request)
-  - Access tokens with permissions (CRUD + restrict for file/directory)
-  - Image previews
-  - Download directories (zip files)
-  - Add Photos and Albums
-  - Shared access between users
-  - Public uploads
-  - Trash bin
-- Background tasks:
-  - Storage migration
-  - Sending email
-  - Clear trash bin with interval
-- Storages:
-  - Support more storages (like S3, see django-storages)
-  - New type: Proxy storage (FsNode not created, structure retrieved from storage)
-  - Search for files or content
+This is the committed scope for the next release. Items move to the
+[next release journal](../releases/next.md) as they are completed.
+
+| Area | Feature | Status |
+| --- | --- | --- |
+| SPA | Upload queue | Planned |
+| Authentication | Password reset | Planned |
+| Authentication | Temporary IP ban after repeated failed logins | Planned |
+
+## Later
+
+Accepted work that is not scheduled for a specific release yet.
+
+### Storage
+- S3 backend and other providers via `django-storages`
+- Proxy storage (structure read from the backend instead of `FsNode` records)
+- Search across file names and content
+- Storage migration between backends
+
+### File management
+- Trash bin with scheduled cleanup
+- Download directories as zip archives
+- Space limits per user, storage and group, with usage display
+- Access tokens with CRUD and per-node permissions
+- Sharing between users
+- Public uploads
+- User settings
+- Toasts for completed actions
+- Continuous session renewal
+- Enhanced image previews and zoom
+- Initial setup wizard for the first superuser and `FsStorage`
+
+### Authentication
+- Custom authentication mechanism, such as OAuth2
+
+### SPA
+- Right-click context menu
+- JavaScript cleanup and style pass
+- Internationalization
+
+### Background tasks
+- Sending email
+
+## Ideas / under consideration
+
+Not committed and not scheduled. These may change or never be implemented.
+
 - Plugin system
-- Native application:
-  - Sync application for computers
-  - Sync application for phones
+- Photos and albums
+- Native desktop and mobile sync applications
