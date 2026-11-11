@@ -22,7 +22,7 @@ export class BreadcrumbsView {
     this.getPublicUrl = ensureAttribute(vnode.attrs.getPublicUrl);
   }
 
-  view() {
+  view(vnode) {
     if (this.FsNodeList.current === null) {
       return null
     }
@@ -31,15 +31,18 @@ export class BreadcrumbsView {
 
     return (
       m("div.card",
-        m("nav.card-body[aria-label=breadcrumb]",
-          m("ol.breadcrumb mb-0", pathArray.map((name, index, array) => (
-            m(FsNodeBcLink, {
-              name: index === 0 ? "Files" : name,
-              index,
-              array,
-              getPublicUrl: this.getPublicUrl,
-            })
-          )))
+        m("nav.card-body[aria-label=breadcrumb].d-flex.align-items-center.gap-2",
+          [
+            m("ol.breadcrumb mb-0 flex-grow-1", pathArray.map((name, index, array) => (
+              m(FsNodeBcLink, {
+                name: index === 0 ? "Files" : name,
+                index,
+                array,
+                getPublicUrl: this.getPublicUrl,
+              })
+            ))),
+            vnode.attrs.actions,
+          ]
         )
       )
     )

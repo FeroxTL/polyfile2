@@ -4,7 +4,13 @@ from django.contrib import admin
 from django.urls import URLPattern, URLResolver, include, path, reverse_lazy
 from django.views.generic import RedirectView
 
-from polyfile.apps.storage.views import download_file_view, upload_file_view
+from polyfile.apps.storage.views import (
+    archive_job_file_view,
+    archive_job_status_view,
+    archive_job_wait_view,
+    download_file_view,
+    upload_file_view,
+)
 from polyfile.core import api
 from polyfile.core.views import fs_node_browse_view, serve_docs
 
@@ -14,6 +20,9 @@ api_patterns = [
     path("api/v1/user/logout/", api.LogoutView.as_view()),
     path("api/", include("polyfile.apps.storage.urls")),
     # LocalDiskBackend urls todo: move to storage app? make dynamic?
+    path("download/jobs/<uuid:job_id>/", archive_job_wait_view, name="archive_job_wait"),
+    path("download/jobs/<uuid:job_id>/status/", archive_job_status_view, name="archive_job_status"),
+    path("download/jobs/<uuid:job_id>/file/", archive_job_file_view, name="archive_job_file"),
     path("download/<uuid:pk>/", download_file_view, name="download_file"),
     path("upload/<token>/", upload_file_view, name="upload_file"),
 ]

@@ -91,13 +91,15 @@ polyfile createsuperuser
 polyfile runserver
 ```
 
-Runtime state is stored in `POLYFILE_DATA_DIR` (the current working directory by default):
+Runtime state is stored in `POLYFILE_DATA_DIR` (`./local` in the current working directory
+by default):
 
 ```text
 <POLYFILE_DATA_DIR>/
   db.sqlite3
   static/
   media/
+  archives/
 ```
 
 Set it explicitly for production:
@@ -131,7 +133,8 @@ ALLOWED_HOSTS=localhost,127.0.0.1
 - `DEBUG_TOOLBAR_ENABLED` enables Django Debug Toolbar. It is enabled by default when
   `DEBUG=True` and `django-debug-toolbar` is installed; the development dependency is not
   part of the wheel.
-- `POLYFILE_DATA_DIR` controls where the database, collected static files, and media live.
+- `POLYFILE_DATA_DIR` controls where the database, collected static files, media, and
+  directory archives live. It defaults to `./local`.
 - `DATABASE_URL` overrides the default SQLite database; see
   [Environment Variables](environment_variables.md) for all supported variables.
 

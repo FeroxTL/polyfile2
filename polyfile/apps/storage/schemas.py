@@ -3,6 +3,7 @@ from pathlib import PurePosixPath
 
 import marshmallow.types
 from django.core.exceptions import ObjectDoesNotExist
+from django.urls import reverse
 from marshmallow import Schema, fields, validate
 from marshmallow.experimental.context import Context
 
@@ -85,9 +86,14 @@ class FsNodeItemSchema(Schema):
     def get_download_url(obj: FsNode) -> str:
         if obj.is_file and obj.file:
             return obj.file.download_url()
-        return ''
+        # The virtual "/" root is an unsaved FsNode, so it has no archive.
+        if obj.is_directory and obj.pk and not obj._state.adding:
+            # Directories are always archived asynchronously, so the URL
+            # starts an archive job instead of streaming a file.
+            return reverse("download_file", kwargs={"pk": obj.pk})
+        return ""
 
-    def get_share(self, obj: FsNode) -> dict[str, str] | None:
+    def get_share(self, obj: FsNode) -> dict[str, str | None] | None:
         """Return public share info for an active share, if any."""
         request = ShareUrlRequestContext.get(None)
         if request is None or not obj.pk:

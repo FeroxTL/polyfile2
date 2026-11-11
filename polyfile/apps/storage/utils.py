@@ -14,6 +14,7 @@ from django_cte import CTE, with_cte
 
 from polyfile.apps.accounts.models import User
 from polyfile.apps.share.models import SharedNode
+from polyfile.apps.storage.archive import cancel_archive_jobs_for_subtree
 from polyfile.apps.storage.managers import get_user_fs_node_by_path
 from polyfile.apps.storage.models import FsNode, FsNodeDeletionJob, TempUpload
 from polyfile.apps.storage.schemas import get_fs_node_name_validator
@@ -191,6 +192,9 @@ def remove_fs_node(user: User, path: pathlib.PurePosixPath) -> FsNodeDeletionJob
         subtree_ids = [row["pk"] for row in rows]
 
         if subtree_ids:
+            # A deleted root invalidates its archive: release the manifest
+            # before tombstoning the nodes so the deletion worker can proceed.
+            cancel_archive_jobs_for_subtree(subtree_ids)
             FsNode.objects.filter(pk__in=subtree_ids).update(
                 deleted_at=now(),
                 deletion_job=job,

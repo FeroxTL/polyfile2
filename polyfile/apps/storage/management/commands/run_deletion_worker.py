@@ -6,10 +6,16 @@ objects. It handles the heavy lifting of deleting files and directories
 recursively by prioritizing file deletion first, then iteratively removing
 empty directories.
 
+Deletion is row-first: database rows are removed together with an outbox
+record for every physical object. The outbox is drained after commit, so a
+crash between the DB and storage cannot leave an object without a retry key.
+
 Key features:
 - Stale job reanimation: Automatically recovers jobs that timed out or crashed.
 - Concurrency safe: Uses `select_for_update(skip_locked=True)` for job claiming.
 - Batch processing: Deletes nodes in chunks to optimize performance and resource usage.
+- Archive protection: `FsNodeArchiveItem` uses `PROTECT`; a protected batch is
+  rolled back and the job is rescheduled instead of failing terminally.
 """
 
 import os
@@ -20,12 +26,17 @@ from abc import ABC, abstractmethod
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
-from django.db import DatabaseError, models
+from django.db import DatabaseError, models, transaction
+from django.db.models.deletion import ProtectedError
 from django.utils.timezone import now
 
 from polyfile.apps.storage.handler import fs_storages
 from polyfile.apps.storage.management.job_strategies import JobStrategyFactory
-from polyfile.apps.storage.models import FsNode, FsNodeDeletionJob
+from polyfile.apps.storage.models import (
+    FsNode,
+    FsNodeDeletionJob,
+    PendingObjectDeletion,
+)
 
 
 class JobClaimStrategy(ABC):
@@ -47,6 +58,8 @@ class DeletionWorker(BaseCommand):
     and error handling during large-scale deletions.
     """
     help = "Run background worker for recursive deletion of FsNode subtrees"
+
+    PROTECTED_RETRY_DELAY = timedelta(seconds=60)
 
     def __init__(self, *args, lock_timeout: int = 300, max_attempts: int = 10, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -88,6 +101,7 @@ class DeletionWorker(BaseCommand):
 
         while self.keep_running:
             self._reanimate_stale_jobs()
+            self._process_outbox(batch_size)
             job = self._claim_job(worker_id)
             if job is None:
                 if once:
@@ -96,6 +110,10 @@ class DeletionWorker(BaseCommand):
                 continue
             try:
                 self._process_job(job, batch_size)
+            except ProtectedError as exc:
+                # An archive manifest still references this node. Roll back the
+                # whole batch and retry later; this is not a terminal failure.
+                self._reschedule_protected_job(job, exc)
             except (OSError, DatabaseError, TimeoutError) as exc:
                 # Handle expected operational errors (disk, DB, timeouts)
                 # Mark the job as failed and continue to the next one
@@ -104,6 +122,8 @@ class DeletionWorker(BaseCommand):
                 # Handle unexpected logic errors (bugs)
                 self.stdout.write(self.style.ERROR(f"Unexpected error occurred: {exc}"))
                 self._fail_job(job, exc)
+            # A job may have produced outbox rows. Drain them before --once exits.
+            self._process_outbox(batch_size)
             if once:
                 break
 
@@ -202,57 +222,110 @@ class DeletionWorker(BaseCommand):
     @staticmethod
     def _delete_file_nodes(file_nodes: list[FsNode]) -> None:
         """
-        Delete file nodes from storage and database.
+        Delete file rows and enqueue their physical objects in one transaction.
 
-        Storage deletion is attempted first. Database rows are removed only for
-        nodes whose storage deletion succeeded. If any file cannot be removed
-        from storage, the remaining tombstones are kept and the caller receives
-        an error so the job is not reported as completed.
+        The outbox row is the durable retry key. It is committed only if the
+        whole `FsNode` batch is deleted, so `PROTECT` from an archive manifest
+        rolls back both the rows and the outbox.
         """
-        by_storage = {}
-        for node in file_nodes:
-            by_storage.setdefault(node.storage_id, []).append(node)
+        with transaction.atomic():
+            outbox = []
+            for node in file_nodes:
+                ref = node.storage_object
+                if ref is None:
+                    continue
+                outbox.append(
+                    PendingObjectDeletion(
+                        storage_id=ref.storage_id,
+                        object_key=ref.key,
+                        node_uuid=node.pk,
+                    )
+                )
+            if outbox:
+                PendingObjectDeletion.objects.bulk_create(outbox, ignore_conflicts=True)
 
-        deleted_nodes = []
-        failures = []
+            # Use queryset delete to avoid FsNode.delete(), which would try to
+            # remove the storage object a second time.
+            FsNode.objects.filter(pk__in=[node.pk for node in file_nodes]).delete()
 
-        for storage_id, nodes in by_storage.items():
-            nodes_with_files = [n for n in nodes if n.file and n.file.name]
-            deleted_nodes.extend(n for n in nodes if not (n.file and n.file.name))
-            if not nodes_with_files:
-                continue
+    def _process_outbox(self, batch_size: int) -> None:
+        """Delete physical objects whose DB rows have already been removed."""
+        rows = list(
+            PendingObjectDeletion.objects.order_by("created_at", "pk")[:batch_size]
+        )
+        if not rows:
+            return
 
+        by_storage: dict[int, list[PendingObjectDeletion]] = {}
+        for row in rows:
+            by_storage.setdefault(row.storage_id, []).append(row)
+
+        successful_ids: list[int] = []
+        for storage_id, entries in by_storage.items():
             try:
                 storage = fs_storages[storage_id]
             except Exception as exc:  # noqa: BLE001 - backend initialization can raise arbitrary errors
-                failures.append(f"storage {storage_id}: {exc}")
+                self._mark_outbox_failure(entries, exc)
                 continue
 
-            names = [n.file.name for n in nodes_with_files]
+            names = [entry.storage_object.key for entry in entries]
             try:
                 results = storage.delete_many(names)
-            except Exception as exc:  # noqa: BLE001 - collect backend errors and report them
-                failures.extend(f"{name!r}: {exc}" for name in names)
+            except Exception as exc:  # noqa: BLE001 - collect backend errors and retry
+                self._mark_outbox_failure(entries, exc)
                 continue
-            for node in nodes_with_files:
-                result = results.get(node.file.name)
+
+            for entry in entries:
+                result = results.get(entry.storage_object.key)
                 if result is True:
-                    deleted_nodes.append(node)
+                    successful_ids.append(entry.pk)
                 else:
-                    failures.append(f"{node.file.name!r}: {result}")
+                    self._mark_outbox_failure(
+                        [entry],
+                        result if isinstance(result, Exception) else OSError(
+                            f"Storage did not delete "
+                            f"{entry.storage_object.key!r}: {result!r}"
+                        ),
+                    )
 
-        # Delete DB rows only for files that were successfully removed from storage.
-        # Use a queryset delete to avoid FsNode.delete(), which would try to remove
-        # the already deleted storage object a second time.
-        pks = [node.pk for node in deleted_nodes]
-        if pks:
-            FsNode.objects.filter(pk__in=pks).delete()
+        if successful_ids:
+            PendingObjectDeletion.objects.filter(pk__in=successful_ids).delete()
 
-        if failures:
-            preview = "; ".join(failures[:5])
-            if len(failures) > 5:
-                preview += f"; ... and {len(failures) - 5} more"
-            raise OSError(f"Failed to delete {len(failures)} file(s) from storage: {preview}")
+    @staticmethod
+    def _mark_outbox_failure(
+        entries: list[PendingObjectDeletion],
+        exc: Exception,
+    ) -> None:
+        message = str(exc)[:4000]
+        for entry in entries:
+            entry.attempts += 1
+            entry.last_error = message
+            entry.save(update_fields=("attempts", "last_error"))
+
+    def _reschedule_protected_job(self, job: FsNodeDeletionJob, exc: ProtectedError) -> None:
+        """Retry a job later when an archive manifest still protects its nodes."""
+        job.status = FsNodeDeletionJob.Status.PENDING
+        # The claim already incremented attempts; protection is not a failed try.
+        job.attempts = max(0, job.attempts - 1)
+        job.scheduled_at = now() + self.PROTECTED_RETRY_DELAY
+        job.locked_until = None
+        job.locked_by = ""
+        job.last_error = str(exc)[:4000]
+        job.save(
+            update_fields=(
+                "status",
+                "attempts",
+                "scheduled_at",
+                "locked_until",
+                "locked_by",
+                "last_error",
+            )
+        )
+        self.stdout.write(
+            self.style.WARNING(
+                f"Job {job.pk} is protected by an archive manifest; retry scheduled"
+            )
+        )
 
     def _fail_job(self, job: FsNodeDeletionJob, exc: Exception) -> None:
         """Handle job failure. Database errors are retried, other errors are terminal."""

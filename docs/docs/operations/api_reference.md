@@ -42,7 +42,7 @@ Returns a recursive tree structure via [FsNode](../system_core/models_data_model
       "mime_type": null,
       "md5": null,
       "file": null,
-      "download_url": null,
+      "download_url": "/download/11111111-1111-1111-1111-111111111111/",
       "path": "/folder/subfolder"
     }
   ]
@@ -120,6 +120,22 @@ Details in [Recursive deletion/background jobs](../system_core/recursive_deletio
 - **Upload**: `POST /upload/<token>/` - Upload raw file content using token from [TempUpload](../system_core/models_data_model.md#tempupload) (handled by storage views)
 
 - **Download**: `GET /download/<uuid:pk>/` - Download file via controlled view using backend's [download_url()](../system_core/storage_backends.md#abstraction-layer)
+
+### Directory archives
+
+Directories are always downloaded asynchronously:
+
+- `GET /download/<uuid:pk>/` - browser request; responds with `303 See Other` to the waiting page.
+- `GET /download/<uuid:pk>/?format=json` - API request; responds with `202 Accepted`, a job id and `Retry-After`.
+- `GET /download/jobs/<job_id>/` - HTML waiting page with polling.
+- `GET /download/jobs/<job_id>/status/` - JSON job state, progress and `file_url` when ready.
+- `GET /download/jobs/<job_id>/file/` - the ready ZIP archive (`202` while building, `410` when unavailable).
+- `HEAD /download/jobs/<job_id>/file/` - availability preflight without streaming the ZIP; returns the same `200`/`202`/`410` status codes.
+
+The `download_url` field in the file list points to the first endpoint for both files and directories.
+The SPA uses `?format=json` and polls the status URL from the waiting modal. Before navigating to
+`file_url`, it sends a `HEAD` request so a deleted or expired archive is reported inside the modal
+instead of opening the JSON error response as a new page.
 
 ## Other endpoints
 - `GET /api/dashboard-context/` - Dashboard context

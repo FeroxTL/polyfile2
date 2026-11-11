@@ -5,7 +5,12 @@ from pathlib import PurePosixPath
 import marshmallow
 from django import http
 from django.contrib.auth.decorators import login_not_required
-from django.http import HttpRequest, HttpResponseBase, JsonResponse
+from django.http import (
+    HttpRequest,
+    HttpResponseBase,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -25,13 +30,19 @@ from polyfile.apps.share.services import (
     list_user_shares,
     revoke_public_share,
 )
-from polyfile.apps.share.utils import validate_download_token
+from polyfile.apps.share.utils import (
+    share_archive_url,
+    validate_download_token,
+)
+from polyfile.apps.storage import archive_delivery
+from polyfile.apps.storage.archive import create_archive_job
 from polyfile.apps.storage.managers import get_user_fs_node_by_path
-from polyfile.apps.storage.models import FsNode
+from polyfile.apps.storage.models import FsNode, FsNodeArchiveJob
 from polyfile.apps.storage.schemas import ensure_absolute_path
 from polyfile.apps.storage.services import serve_file
 from polyfile.apps.storage.utils import get_fs_node_with_children
 from polyfile.core import exceptions
+from polyfile.core.http import vary_on_accept, wants_html
 from polyfile.core.rest.generics import AnonymousApiView, BaseApiView
 
 
@@ -95,10 +106,31 @@ class GetShareDetailApiView(AnonymousApiView):
             # TODO: we already checked parent, can skip checking child
             if fs_node_with_children.current and getattr(fs_node_with_children.current, 'deleted_at', None) is not None:
                 raise exceptions.NotFound(f"Share with token {share_token} does not exist.")
-            with SharedNodeTokenContext(share.token):
+            with SharedNodeTokenContext(share):
                 return http.JsonResponse(data=self.response_serializer.dump(fs_node_with_children))
         except SharedNode.DoesNotExist:
             raise exceptions.NotFound(f"Share with token {share_token} does not exist.")
+
+
+def _share_archive_urls(
+    request: HttpRequest,
+    share: SharedNode,
+    job: FsNodeArchiveJob,
+) -> tuple[str, str]:
+    """Build absolute signed status and file URLs for a share archive."""
+    status_url = request.build_absolute_uri(share_archive_url(
+        "share-archive-status",
+        share.token,
+        share.root_fs_node_id,
+        job.pk,
+    ))
+    file_url = request.build_absolute_uri(share_archive_url(
+        "share-archive-file",
+        share.token,
+        share.root_fs_node_id,
+        job.pk,
+    ))
+    return status_url, file_url
 
 
 @login_not_required
@@ -145,10 +177,187 @@ def public_share_download(
             skip_permission_check=True,
         )
 
-    # TODO: We can not download directories now
-    return render(request, "share/error.html", status=404, context={
-        "error_message": "Can not download directory. Sorry for that",
+    if node.pk != share.root_fs_node_id:
+        return render(request, "share/error.html", status=404, context={
+            "error_message": "Only the shared directory itself can be archived.",
+        })
+
+    try:
+        job = create_archive_job(None, node, share=share)
+    except exceptions.HttpException as exc:
+        return render(request, "share/error.html", status=exc.status_code, context={
+            "error_message": exc.detail,
+        })
+
+    status_url, file_url = _share_archive_urls(request, share, job)
+
+    if request.GET.get("format", "").lower() == "json":
+        return archive_delivery.accepted_response(
+            job,
+            status_url=status_url,
+            file_url=file_url,
+        )
+
+    redirect_response = HttpResponseRedirect(share_archive_url(
+        "share-archive-wait",
+        share.token,
+        node.pk,
+        job.pk,
+    ))
+    redirect_response.status_code = 303
+    return redirect_response
+
+
+def _get_share_for_archive(
+    share_token: uuid.UUID,
+    time_offset: str,
+    signature: str,
+):
+    """Load and validate a share for one of its archive job URLs."""
+    try:
+        share = SharedNode.objects.get(token=share_token)
+    except SharedNode.DoesNotExist:
+        raise exceptions.NotFound(f"Share with token {share_token} does not exist.")
+
+    if not validate_download_token(
+        str(share.token),
+        str(share.root_fs_node_id),
+        time_offset,
+        signature,
+    ):
+        raise exceptions.NotFound("Invalid or expired archive link.")
+
+    return share
+
+
+@login_not_required
+def share_archive_wait_view(
+    request: HttpRequest,
+    share_token: uuid.UUID,
+    job_id: uuid.UUID,
+    time_offset: str,
+    signature: str,
+):
+    """HTML waiting page for a public directory archive."""
+    try:
+        share = _get_share_for_archive(share_token, time_offset, signature)
+        job, _root = archive_delivery.get_archive_job_for_share(share, job_id)
+        archive_delivery.expire_if_needed(job)
+    except exceptions.HttpException as exc:
+        return render(request, "share/error.html", status=exc.status_code, context={
+            "error_message": exc.detail,
+        })
+
+    status_url, file_url = _share_archive_urls(request, share, job)
+
+    if job.status == FsNodeArchiveJob.Status.READY:
+        redirect_response = HttpResponseRedirect(file_url)
+        redirect_response.status_code = 303
+        return redirect_response
+
+    if job.status in (
+        FsNodeArchiveJob.Status.FAILED,
+        FsNodeArchiveJob.Status.CANCELLED,
+        FsNodeArchiveJob.Status.EXPIRED,
+    ):
+        return render(request, "share/error.html", status=410, context={
+            "error_message": job.last_error or "The archive is no longer available.",
+        })
+
+    return render(request, "storage/archive_wait.html", context={
+        "job": job,
+        "status_url": status_url,
+        "file_url": file_url,
+        "retry_after": archive_delivery.get_retry_after(),
     })
+
+
+@login_not_required
+def share_archive_status_view(
+    request: HttpRequest,
+    share_token: uuid.UUID,
+    job_id: uuid.UUID,
+    time_offset: str,
+    signature: str,
+):
+    """JSON status endpoint for a public directory archive."""
+    try:
+        share = _get_share_for_archive(share_token, time_offset, signature)
+        job, _root = archive_delivery.get_archive_job_for_share(share, job_id)
+        archive_delivery.expire_if_needed(job)
+    except exceptions.HttpException as exc:
+        return JsonResponse(
+            {
+                "error_id": exc.error_code,
+                "description": exc.description,
+                "detail": exc.detail,
+            },
+            status=exc.status_code,
+        )
+
+    status_url, file_url = _share_archive_urls(request, share, job)
+    return archive_delivery.status_response(
+        job,
+        status_url=status_url,
+        file_url=file_url,
+    )
+
+
+@login_not_required
+def share_archive_file_view(
+    request: HttpRequest,
+    share_token: uuid.UUID,
+    job_id: uuid.UUID,
+    time_offset: str,
+    signature: str,
+):
+    """Serve a public directory archive."""
+    try:
+        share = _get_share_for_archive(share_token, time_offset, signature)
+        job, _root = archive_delivery.get_archive_job_for_share(share, job_id)
+        archive_delivery.expire_if_needed(job)
+        status_url, file_url = _share_archive_urls(request, share, job)
+
+        if job.status in (
+            FsNodeArchiveJob.Status.PENDING,
+            FsNodeArchiveJob.Status.RUNNING,
+        ):
+            return archive_delivery.accepted_response(
+                job,
+                status_url=status_url,
+                file_url=file_url,
+            )
+
+        if job.status != FsNodeArchiveJob.Status.READY:
+            raise exceptions.ArchiveUnavailable(
+                detail=job.last_error or "The archive is no longer available.",
+            )
+
+        if request.method != "HEAD":
+            ShareDownload.objects.create(
+                share=share,
+                ip=request.META.get("REMOTE_ADDR"),
+                user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            )
+        return archive_delivery.serve_archive(
+            job,
+            head=request.method == "HEAD",
+        )
+    except exceptions.HttpException as exc:
+        if wants_html(request):
+            return vary_on_accept(
+                render(request, "share/error.html", status=exc.status_code, context={
+                    "error_message": exc.detail,
+                }),
+            )
+        return vary_on_accept(JsonResponse(
+            {
+                "error_id": exc.error_code,
+                "description": exc.description,
+                "detail": exc.detail,
+            },
+            status=exc.status_code,
+        ))
 
 
 class CreateShareView(BaseApiView):

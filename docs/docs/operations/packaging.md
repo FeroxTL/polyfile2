@@ -105,7 +105,7 @@ uv venv .venv
 uv pip install dist/polyfile-0.1.0-py3-none-any.whl
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
-# Runtime state (SQLite database, collected static, media) belongs here:
+# Runtime state (SQLite database, collected static, media, archives) belongs here:
 export POLYFILE_DATA_DIR=/var/lib/polyfile
 
 polyfile check
@@ -132,6 +132,7 @@ If the console script is not on `PATH`, run the same commands through the module
 | `POLYFILE_DATA_DIR/db.sqlite3` | SQLite database (unless `DATABASE_URL` is set)                         |
 | `POLYFILE_DATA_DIR/static/`    | Output of `collectstatic`                                              |
 | `POLYFILE_DATA_DIR/media/`     | Default media root; actual file storage is configured per `FsStorage`  |
+| `POLYFILE_DATA_DIR/archives/`  | Temporary ZIP archives for asynchronous directory downloads            |
 
 `docs/` and `frontend/` are source directories for the repository; they are not part of
 the installed package.

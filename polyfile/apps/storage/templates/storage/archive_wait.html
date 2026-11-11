@@ -1,0 +1,99 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Preparing archive{% endblock %}
+
+{% block body %}
+<div class="container" style="max-width: 640px; margin: 4rem auto; font-family: system-ui, sans-serif;">
+  <h1 id="archive-title">Preparing your archive</h1>
+  <p id="archive-message">The ZIP file is being built. This page will update automatically.</p>
+  <progress id="archive-progress" value="0" max="100" style="width: 100%; height: 1.25rem;"></progress>
+  <p id="archive-details" style="color: #555;"></p>
+  <p id="archive-error" role="alert" style="color: #b00020;"></p>
+  <p><a id="archive-download" href="#" style="display: none;">Download archive</a></p>
+</div>
+
+<script>
+(function () {
+  const statusUrl = "{{ status_url|escapejs }}";
+  const retryAfter = {{ retry_after|default:2 }};
+  const title = document.getElementById("archive-title");
+  const message = document.getElementById("archive-message");
+  const progress = document.getElementById("archive-progress");
+  const details = document.getElementById("archive-details");
+  const error = document.getElementById("archive-error");
+  const download = document.getElementById("archive-download");
+
+  function showError(text) {
+    title.textContent = "Archive unavailable";
+    document.title = "Archive unavailable";
+    error.textContent = text || "The archive is no longer available.";
+    message.textContent = "The archive could not be prepared.";
+    progress.style.display = "none";
+    details.textContent = "";
+  }
+
+  function showReady(fileUrl) {
+    title.textContent = "Your archive is ready";
+    document.title = "Archive ready";
+    message.textContent =
+      "The download will start automatically. If it does not, use the link below.";
+    progress.value = progress.max;
+    details.textContent = "";
+    download.href = fileUrl;
+    download.style.display = "inline";
+    // The response is served as an attachment, so the browser starts the
+    // download and keeps this page visible.
+    window.location.assign(fileUrl);
+  }
+
+  function update(data) {
+    if (data.status === "ready" && data.file_url) {
+      showReady(data.file_url);
+      return;
+    }
+
+    if (["failed", "cancelled", "expired"].includes(data.status)) {
+      showError(data.last_error);
+      return;
+    }
+
+    const totalFiles = data.total_files || 0;
+    const processedFiles = data.processed_files || 0;
+    if (totalFiles > 0) {
+      progress.value = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
+    } else {
+      progress.removeAttribute("value");
+    }
+    details.textContent = processedFiles + " of " + totalFiles + " files processed";
+
+    const delay = Math.max(1, Number(data.retry_after || retryAfter)) * 1000;
+    window.setTimeout(poll, delay);
+  }
+
+  async function poll() {
+    try {
+      const response = await fetch(statusUrl, {
+        headers: { "Accept": "application/json" },
+        cache: "no-store",
+      });
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        showError("Could not check the archive status. Please reload the page.");
+        return;
+      }
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.message || data.detail || data.description);
+        return;
+      }
+      update(data);
+    } catch (exc) {
+      error.textContent = "Could not check the archive status. Retrying...";
+      window.setTimeout(poll, Math.max(1, retryAfter) * 1000);
+    }
+  }
+
+  poll();
+})();
+</script>
+{% endblock %}

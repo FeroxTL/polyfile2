@@ -24,7 +24,10 @@ class RelationalClaimStrategy(JobClaimStrategy):
             # This is a standard high-performance way for queues in SQL
             job = (
                 FsNodeDeletionJob.objects.select_for_update(skip_locked=True)
-                .filter(status=FsNodeDeletionJob.Status.PENDING)
+                .filter(
+                    status=FsNodeDeletionJob.Status.PENDING,
+                    scheduled_at__lte=now(),
+                )
                 .order_by("scheduled_at")
                 .first()
             )
@@ -49,7 +52,10 @@ class SQLiteClaimStrategy(JobClaimStrategy):
         # If another worker succeeded first, the number of updated rows will be 0.
 
         job_id = (
-            FsNodeDeletionJob.objects.filter(status=FsNodeDeletionJob.Status.PENDING)
+            FsNodeDeletionJob.objects.filter(
+                status=FsNodeDeletionJob.Status.PENDING,
+                scheduled_at__lte=now(),
+            )
             .order_by("scheduled_at")
             .values("id")
             .first()

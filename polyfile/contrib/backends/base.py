@@ -10,7 +10,13 @@ class FsBackendBase(Storage):
     name = None
 
     def download_url(self, instance: models.Model) -> str:
-        """Generate a URL for downloading a file. Must be implemented by subclasses."""
+        """Return a URL for downloading ``instance``.
+
+        Backends choose the representation: an authorized application view URL
+        for local storage, or a signed direct URL for cloud storage. The
+        instance is required because storage-relative names do not identify the
+        owning ``FsNode``.
+        """
         raise NotImplementedError
 
     def save_file(self, fs_node: models.Model, request: HttpRequest) -> None:

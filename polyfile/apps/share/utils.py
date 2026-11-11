@@ -130,3 +130,24 @@ def share_download_url(share_token: str | uuid.UUID, fs_node_id: str | uuid.UUID
         "time_offset": time_offset,
         "signature": signature,
     })
+
+
+def share_archive_url(
+    view_name: str,
+    share_token: str | uuid.UUID,
+    fs_node_id: str | uuid.UUID,
+    job_id: str | uuid.UUID,
+) -> str:
+    """Build a signed URL for a job of a public directory share."""
+    share_token = str(share_token)
+    fs_node_id = str(fs_node_id)
+    expiration_time = timezone.now() + timedelta(hours=1)
+    time_offset = time_to_offset(expiration_time)
+    signature = generate_download_token(share_token, fs_node_id, expiration_time)
+
+    return reverse(view_name, kwargs={
+        "share_token": share_token,
+        "job_id": str(job_id),
+        "time_offset": time_offset,
+        "signature": signature,
+    })

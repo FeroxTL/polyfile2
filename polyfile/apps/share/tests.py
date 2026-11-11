@@ -396,13 +396,13 @@ class ShareDetailApiTests(ShareBaseTest):
         self.assertEqual(file_response.status_code, 404)
         # TODO check response.json()
 
-    def test_download_inactive_directory_share(self) -> None:
+    def test_download_active_directory_share(self) -> None:
         """Check download directory in share."""
         share = SharedNodeFactory(owner=self.owner, root_fs_node=self.root_dir)
         self.client.login()
         file_response = self.client.get(share_download_url(share.token, self.root_dir.id))
-        self.assertEqual(file_response.status_code, 404)
-        # TODO check response.json()
+        self.assertEqual(file_response.status_code, 303)
+        self.assertIn("/s/archive/", file_response["Location"])
 
     def test_root_details_are_publicly_accessible(self) -> None:
         """Check that anonymous visitor gets the root node and its children in payload."""
@@ -423,7 +423,7 @@ class ShareDetailApiTests(ShareBaseTest):
                     "mime_type": "",
                     "md5": "",
                     "file": "",
-                    "download_url": "",
+                    "download_url": mock.ANY,
                     "path": "/",
                 },
                 "children": [
@@ -456,6 +456,26 @@ class ShareDetailApiTests(ShareBaseTest):
         file_response = self.client.get(response.json()["children"][1]["download_url"])
         self.assertIsInstance(file_response, StreamingHttpResponse)
         file_response.close()
+
+    def test_only_shared_root_directory_has_archive_url(self) -> None:
+        """The root can be archived, nested directories cannot."""
+        share = SharedNodeFactory(owner=self.owner, root_fs_node=self.root_dir)
+        self.client.logout()
+        response = self.client.get(self._api_url(share.token, "/"))
+        data = response.json()
+
+        self.assertEqual(
+            data["current"]["download_url"],
+            share_download_url(share.token, self.root_dir.id),
+        )
+        child_directories = [
+            child
+            for child in data["children"]
+            if child["type"] == FsNode.TypeChoices.DIRECTORY.value
+        ]
+        self.assertTrue(child_directories)
+        for child in child_directories:
+            self.assertEqual(child["download_url"], "")
 
     def test_child_details_are_publicly_accessible(self) -> None:
         """Check that anonymous visitor gets the root node and its children in payload."""

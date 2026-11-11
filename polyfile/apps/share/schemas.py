@@ -1,9 +1,8 @@
-import uuid
-
 from django.http import HttpRequest
 from marshmallow import Schema, fields
 from marshmallow.experimental.context import Context
 
+from polyfile.apps.share.models import SharedNode
 from polyfile.apps.share.services import get_share_status
 from polyfile.apps.share.utils import get_public_share_url, share_download_url
 from polyfile.apps.storage.models import FsNode
@@ -12,7 +11,7 @@ from polyfile.apps.storage.schemas import (
     FsNodeItemSchema,
 )
 
-SharedNodeTokenContext = Context[uuid.UUID]
+SharedNodeTokenContext = Context[SharedNode]
 ShareListRequestContext = Context[HttpRequest]
 
 
@@ -21,8 +20,13 @@ class ShareFsNodeItemSchema(FsNodeItemSchema):
 
     @staticmethod
     def get_download_url(obj: FsNode) -> str:
+        share = SharedNodeTokenContext.get()
         if obj.type == FsNode.TypeChoices.FILE and obj.file:
-            return share_download_url(SharedNodeTokenContext.get(), obj.pk)
+            return share_download_url(share.token, obj.pk)
+        if obj.is_directory and obj.pk == share.root_fs_node_id:
+            # Only the shared root can be archived; nested directories do not
+            # get an archive URL because the public API rejects them.
+            return share_download_url(share.token, obj.pk)
         return ""
 
 

@@ -11,6 +11,7 @@ from django_hint import StandardModelType
 
 from polyfile.apps.storage import model_fields
 from polyfile.apps.storage.handler import registered_backends
+from polyfile.apps.storage.storage_objects import StorageObjectRef
 
 
 def get_backend_choices() -> dict[str, str]:
@@ -79,6 +80,35 @@ class FsNodeDeletionJob(models.Model, StandardModelType['FsNodeDeletionJob']):
         return f"DeletionJob {self.pk} ({self.status})"
 
 
+class PendingObjectDeletion(models.Model, StandardModelType["PendingObjectDeletion"]):
+    """Durable outbox entry for physical objects whose DB rows are already deleted."""
+
+    storage_id = models.BigIntegerField(db_index=True)
+    object_key = models.CharField(max_length=255)
+    node_uuid = models.UUIDField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Pending object deletion"
+        verbose_name_plural = "Pending object deletions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["storage_id", "object_key"],
+                name="uniq_pending_object_deletion",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"PendingObjectDeletion {self.storage_id}:{self.object_key}"
+
+    @property
+    def storage_object(self) -> StorageObjectRef:
+        """Return the physical object this outbox row must delete."""
+        return StorageObjectRef(self.storage_id, self.object_key)
+
+
 class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
     """Base fields for ancestors."""
     file = model_fields.FsStorageFileField(
@@ -115,13 +145,20 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
     class Meta:
         abstract = True
 
-    storage_id: str | None
+    storage_id: int | None
     owner_id: int | None
     _path: str | None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._path = None
+
+    @property
+    def storage_object(self) -> StorageObjectRef | None:
+        """Return this node's physical object, or ``None`` when nothing was uploaded."""
+        if self.storage_id is None or not self.file.name:
+            return None
+        return StorageObjectRef(self.storage_id, self.file.name)
 
     @property
     def path(self) -> str:
@@ -168,7 +205,7 @@ class FsNode(AbstractFsNode):
         db_index=True,
         blank=False, null=False,
     )
-    size = models.PositiveIntegerField(
+    size = models.PositiveBigIntegerField(
         verbose_name="Size",
         default=0,
         help_text="Size in bytes",
@@ -257,6 +294,138 @@ class FsNode(AbstractFsNode):
             raise exceptions.ValidationError({
                 "file": "Required",  # TODO: specify error text
             })
+
+
+class FsNodeArchiveJob(models.Model, StandardModelType["FsNodeArchiveJob"]):
+    """Background job that builds a ZIP archive for a directory snapshot."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        RUNNING = "running", "Running"
+        READY = "ready", "Ready"
+        FAILED = "failed", "Failed"
+        EXPIRED = "expired", "Expired"
+        CANCELLED = "cancelled", "Cancelled"
+
+    ACTIVE_STATUSES = (Status.PENDING, Status.RUNNING, Status.READY)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="archive_jobs",
+    )
+    root_node_uuid = models.UUIDField(db_index=True)
+    root_node_name = models.CharField(max_length=255)
+    fingerprint = models.CharField(max_length=64, db_index=True)
+    status = models.CharField(
+        max_length=16,
+        choices=Status,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    total_files = models.PositiveIntegerField(default=0)
+    total_bytes = models.PositiveBigIntegerField(default=0)
+    processed_files = models.PositiveIntegerField(default=0)
+    processed_bytes = models.PositiveBigIntegerField(default=0)
+    archive_key = models.CharField(max_length=255, blank=True)
+    archive_size = models.PositiveBigIntegerField(default=0)
+    archive_md5 = models.CharField(max_length=32, blank=True)
+    cancel_requested = models.BooleanField(default=False)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    locked_until = models.DateTimeField(null=True, blank=True, db_index=True)
+    locked_by = models.CharField(max_length=255, blank=True)
+    scheduled_at = models.DateTimeField(default=now, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_accessed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    reserved_bytes = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Archive job"
+        verbose_name_plural = "Archive jobs"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["root_node_uuid", "fingerprint"],
+                condition=Q(status__in=("pending", "running", "ready")),
+                name="uniq_active_archive_job",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"ArchiveJob {self.pk} ({self.status})"
+
+
+class FsNodeArchiveItem(models.Model, StandardModelType["FsNodeArchiveItem"]):
+    """Immutable manifest entry: snapshot metadata and deletion protection for one node."""
+
+    class EntryType(models.TextChoices):
+        FILE = "file", "File"
+        DIRECTORY = "directory", "Directory"
+
+    job = models.ForeignKey(
+        FsNodeArchiveJob,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    node = models.ForeignKey(
+        FsNode,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="archive_items",
+    )
+    entry_type = models.CharField(max_length=16, choices=EntryType)
+    zip_path = models.CharField(max_length=1024)
+    # Snapshot of the physical source object: (storage_id, object_key) is copied
+    # from FsNode.storage_id / FsNode.file at request time. It is not resolved
+    # through the `node` FK at build time on purpose: `FsNode.file` is mutable
+    # (re-upload, replace, storage migration) and PROTECT only prevents deletion.
+    # An empty object_key marks a directory or a file node that was never uploaded.
+    object_key = models.CharField(max_length=255, blank=True)
+    storage_id = models.BigIntegerField(null=True, blank=True, db_index=True)
+    size = models.PositiveBigIntegerField(default=0)
+    md5 = models.CharField(max_length=32, blank=True)
+    modified_at = models.DateTimeField(null=True, blank=True)
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        verbose_name = "Archive item"
+        verbose_name_plural = "Archive items"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["job", "node"],
+                condition=Q(node__isnull=False),
+                name="uniq_archive_item_node",
+            ),
+            models.UniqueConstraint(
+                fields=["job", "zip_path"],
+                name="uniq_archive_item_zip_path",
+            ),
+            models.UniqueConstraint(
+                fields=["job", "position"],
+                name="uniq_archive_item_position",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.zip_path} ({self.entry_type})"
+
+    @property
+    def storage_object(self) -> StorageObjectRef | None:
+        """Return the snapshotted source object.
+
+        ``None`` means the entry has no physical source: a directory or a file
+        node that was created but never uploaded.
+        """
+        if self.storage_id is None or not self.object_key:
+            return None
+        return StorageObjectRef(self.storage_id, self.object_key)
 
 
 class TempUpload(models.Model, StandardModelType['TempUpload']):

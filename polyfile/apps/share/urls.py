@@ -8,6 +8,9 @@ from polyfile.apps.share.views import (
     PermanentDeleteShareView,
     RevokeShareView,
     public_share_download,
+    share_archive_file_view,
+    share_archive_status_view,
+    share_archive_wait_view,
 )
 
 urlpatterns = [
@@ -21,6 +24,21 @@ urlpatterns = [
         "s/download/<str:share_token>/<str:fs_node_id>/<str:time_offset>/<str:signature>",
         public_share_download,
         name="share-download",
+    ),
+    path(
+        "s/archive/<uuid:share_token>/<uuid:job_id>/status/<str:time_offset>/<str:signature>/",
+        share_archive_status_view,
+        name="share-archive-status",
+    ),
+    path(
+        "s/archive/<uuid:share_token>/<uuid:job_id>/file/<str:time_offset>/<str:signature>/",
+        share_archive_file_view,
+        name="share-archive-file",
+    ),
+    path(
+        "s/archive/<uuid:share_token>/<uuid:job_id>/<str:time_offset>/<str:signature>/",
+        share_archive_wait_view,
+        name="share-archive-wait",
     ),
     # Api pages
     path(

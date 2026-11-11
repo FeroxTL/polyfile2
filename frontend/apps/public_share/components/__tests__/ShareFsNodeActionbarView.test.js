@@ -3,11 +3,16 @@ import m from "mithril";
 
 import { ShareFsNodeActionbarView } from "../ShareFsNodeActionbarView";
 
-const renderActionbar = (selectedList, onClose = vi.fn()) => (
+const renderActionbar = (
+  selectedList,
+  onClose = vi.fn(),
+  onDownload = vi.fn(),
+) => (
   ShareFsNodeActionbarView.view({
     attrs: {
       selectedList,
       onClose,
+      onDownload,
     },
   })
 );
@@ -39,6 +44,46 @@ describe("ShareFsNodeActionbarView", () => {
     const downloadLink = getDownloadLink(renderActionbar([selectedItem]));
 
     expect(downloadLink.attrs.className).toContain("disabled");
+  });
+
+  it("hands directory downloads to the archive handler", () => {
+    const selectedItem = {
+      name: "docs",
+      type: "directory",
+      download_url: "/s/download/token/node/",
+    };
+    const onDownload = vi.fn();
+    const downloadLink = getDownloadLink(renderActionbar(
+      [selectedItem],
+      vi.fn(),
+      onDownload,
+    ));
+    const event = { preventDefault: vi.fn() };
+
+    downloadLink.attrs.onclick(event);
+
+    expect(onDownload).toHaveBeenCalledWith(selectedItem);
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it("lets file downloads navigate normally", () => {
+    const selectedItem = {
+      name: "file.txt",
+      type: "file",
+      download_url: "/s/download/token/file/",
+    };
+    const onDownload = vi.fn();
+    const downloadLink = getDownloadLink(renderActionbar(
+      [selectedItem],
+      vi.fn(),
+      onDownload,
+    ));
+    const event = { preventDefault: vi.fn() };
+
+    downloadLink.attrs.onclick(event);
+
+    expect(onDownload).not.toHaveBeenCalled();
+    expect(event.preventDefault).not.toHaveBeenCalled();
   });
 
   it("clears the selection when the close button is clicked", () => {

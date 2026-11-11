@@ -67,7 +67,7 @@ POLYFILE_DATA_DIR=./data .venv/bin/polyfile run_deletion_worker
 
 The wheel includes the production frontend assets and the pre-built HTML documentation and
 does not require Node.js or MkDocs. Runtime data (SQLite database, collected static files,
-media) is stored in `POLYFILE_DATA_DIR` (the current directory by default).
+media, and directory archives) is stored in `POLYFILE_DATA_DIR` (`./local` by default).
 
 See the [documentation](docs/docs/index.md) for configuration, deployment, and packaging
 details.

@@ -14,7 +14,7 @@ This allows configuring different storage locations per [FsStorage](models_data_
 ### Abstraction layer
 All backends inherit from `FsBackendBase` (in `polyfile.contrib.backends.base`), which extends Django's `Storage` class. This means they follow Django's storage interface while adding Polyfile-specific hooks:
 
-- `download_url(instance)` - generate a URL to download a file through Polyfile's controlled download flow
+- `download_url(instance)` - generate a URL to download a file through Polyfile's controlled download flow, or a backend-specific direct/signed URL
 - `save_file(fs_node, request)` - save uploaded file content for a given [FsNode](models_data_model.md#fsnode)
 - `delete_many(names)` - bulk delete physical files efficiently (with a sensible default implementation)
 
@@ -22,7 +22,7 @@ Backends are registered in `polyfile.apps.storage.handler.registered_backends` a
 
 ### Integration with the file tree
 - **Creation**: When creating a file through the [API](../operations/api_reference.md), a [FsNode](models_data_model.md#fsnode) is created first (with metadata), then `save_file()` streams the uploaded content into the backend and updates the node with `size`, `md5`, and `mime_type`.
-- **Download**: The backend provides `download_url()` which typically points to Polyfile's download view (e.g., for [FileSystemBackend](#file-system-backend) it reverses to `download_file`).
+- **Download**: The backend provides `download_url()` which typically points to Polyfile's download view (e.g., for [FileSystemBackend](#file-system-backend) it reverses to `download_file`). `FsStorageFieldFile.url` delegates to `download_url()`, so `node.file.url` used by admin and form widgets is safe too and never exposes a raw `MEDIA_URL` link.
 - **Deletion**: Physical deletion is coordinated with [recursive deletion](recursive_deletion_background_jobs.md). The deletion worker collects files to remove and calls `delete_many()` on the appropriate backend for efficient bulk removal. Backends report per-file results (`True` on success or "file not found", or an `Exception` on failure).
 
 ## File system backend
@@ -45,7 +45,7 @@ File uploads in Polyfile use a two-step flow tied to [TempUpload](models_data_mo
 `FileSystemBackend.delete_many()` unlinks files directly with `os.unlink()`. It treats `FileNotFoundError` as success (idempotent) and collects other `OSError` instances as failures in the results dict.
 
 ### Download
-`download_url()` generates a URL that routes through Polyfile's controlled download mechanism (`reverse('download_file', ...)`), keeping download logic centralized rather than exposing raw filesystem paths directly.
+`download_url()` generates a URL that routes through Polyfile's controlled download mechanism (`reverse('download_file', ...)`), keeping download logic centralized rather than exposing raw filesystem paths directly. `FsStorageFieldFile.url` delegates to it, so `node.file.url` resolves to the same controlled URL.
 
 ## Path handling
 

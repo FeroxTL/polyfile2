@@ -7,6 +7,7 @@ from django.db.models import Count, Max, Q
 from django.utils import timezone
 
 from polyfile.apps.share.models import SharedNode
+from polyfile.apps.storage.archive import cancel_archive_jobs_for_root
 from polyfile.apps.storage.managers import get_user_fs_node_paths
 from polyfile.apps.storage.models import FsNode
 
@@ -173,6 +174,7 @@ def revoke_public_share(user: User, share_token: uuid.UUID) -> SharedNode:
     if share.revoked_at is None:
         share.revoked_at = timezone.now()
         share.save(update_fields=("revoked_at",))
+        cancel_archive_jobs_for_root(share.root_fs_node_id)
 
     return share
 
@@ -190,4 +192,6 @@ def hard_delete_public_share(user: User, share_token: uuid.UUID) -> None:
     :raises SharedNode.DoesNotExist: If no share with this token belongs to the user.
     """
     share = SharedNode.objects.get(token=share_token, owner=user)
+    root_node_id = share.root_fs_node_id
     share.delete()
+    cancel_archive_jobs_for_root(root_node_id)

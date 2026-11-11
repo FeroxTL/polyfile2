@@ -72,3 +72,27 @@ class FsNodeExistsError(HttpException):
     status_code = 409
     error_code = 'FsNodeExistsError'
     description = _('Target object already exists.')
+
+
+class ArchiveLimitExceeded(HttpException):
+    """Directory archive exceeds the configured file or byte limit."""
+
+    status_code = 413
+    error_code = 'ArchiveLimitExceeded'
+    description = _('The directory is too large to archive.')
+
+
+class ArchiveSnapshotConflict(HttpException):
+    """The directory changed while its archive snapshot was being created."""
+
+    status_code = 409
+    error_code = 'ArchiveSnapshotConflict'
+    description = _('The directory changed during snapshot creation.')
+
+
+class ArchiveUnavailable(HttpException):
+    """The archive is gone, expired or belongs to a deleted directory."""
+
+    status_code = 410
+    error_code = 'ArchiveUnavailable'
+    description = _('The archive is no longer available.')

@@ -7,8 +7,11 @@ from django.utils.translation import gettext as _
 
 from polyfile.apps.storage.models import (
     FsNode,
+    FsNodeArchiveItem,
+    FsNodeArchiveJob,
     FsNodeDeletionJob,
     FsStorage,
+    PendingObjectDeletion,
     TempUpload,
 )
 from polyfile.apps.storage.utils import get_md5_sum, get_mime_type
@@ -71,3 +74,47 @@ class TempUploadAdmin(admin.ModelAdmin):
 class FsNodeDeletionJob(admin.ModelAdmin):
     list_display = ("id", "root_path", "status", "total_nodes",)
     list_filter = ("status",)
+
+
+@admin.register(PendingObjectDeletion)
+class PendingObjectDeletionAdmin(admin.ModelAdmin):
+    list_display = ("storage_id", "object_key", "node_uuid", "created_at", "attempts")
+    list_filter = ("storage_id",)
+    search_fields = ("object_key", "node_uuid")
+    readonly_fields = ("created_at",)
+    date_hierarchy = "created_at"
+
+
+@admin.register(FsNodeArchiveJob)
+class FsNodeArchiveJobAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "root_node_name",
+        "status",
+        "total_files",
+        "total_bytes",
+        "created_at",
+        "expires_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("root_node_name", "root_node_uuid", "fingerprint")
+    raw_id_fields = ("requested_by",)
+    readonly_fields = (
+        "id",
+        "created_at",
+        "started_at",
+        "finished_at",
+        "archive_size",
+        "archive_md5",
+    )
+    date_hierarchy = "created_at"
+
+
+@admin.register(FsNodeArchiveItem)
+class FsNodeArchiveItemAdmin(admin.ModelAdmin):
+    list_display = ("job", "entry_type", "zip_path", "size", "position")
+    list_filter = ("entry_type",)
+    search_fields = ("zip_path", "object_key")
+    raw_id_fields = ("job", "node")
+    ordering = ("job", "position")
+    list_select_related = ("job", "node")

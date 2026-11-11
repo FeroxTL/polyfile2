@@ -21,9 +21,32 @@ class FsStorageFieldFile(FieldFile):
             self.storage = fs_storages[instance.storage_id]
 
     def download_url(self) -> str:
-        """Public url."""
-        # TODO: cache?
-        return self.storage.download_url(self.instance)
+        """Public download URL for this node's file.
+
+        The backend decides what the URL is: the local backend points at the
+        authorized download view, while a cloud backend may return a signed
+        direct URL.
+        """
+        if self.storage:
+            return self.storage.download_url(self.instance)
+        return ""
+
+    @property
+    def url(self) -> str:
+        """Django-compatible URL used by admin and form widgets.
+
+        Delegates to :meth:`download_url` so ``FileField.url`` never leaks a
+        raw ``MEDIA_URL`` link. Returns an empty string for nodes without a
+        stored object or storage, which keeps admin rendering safe.
+        """
+        if (
+            not self.name
+            or not isinstance(self.storage, FsBackendBase)
+            or self.instance._state.adding
+            or not self.instance.pk
+        ):
+            return ""
+        return self.download_url()
 
 
 class FsStorageFileField(models.FileField):

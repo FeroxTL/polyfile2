@@ -16,6 +16,7 @@ from django.utils.timezone import now
 
 from polyfile.apps.accounts.factories import UserFactory
 from polyfile.apps.storage.factories import (
+    FsNodeArchiveItemFactory,
     FsNodeDirectoryFactory,
     FsNodeFileFactory,
     StorageFactory,
@@ -28,7 +29,12 @@ from polyfile.apps.storage.management.job_strategies import (
     RelationalClaimStrategy,
     SQLiteClaimStrategy,
 )
-from polyfile.apps.storage.models import FsNode, FsNodeDeletionJob, FsStorage
+from polyfile.apps.storage.models import (
+    FsNode,
+    FsNodeDeletionJob,
+    FsStorage,
+    PendingObjectDeletion,
+)
 from polyfile.apps.storage.utils import remove_fs_node
 from polyfile.contrib.backends.file_system_backend.backend import FileSystemBackend
 from polyfile.contrib.backends.utils import get_storage_path
@@ -68,6 +74,16 @@ class PartialFailingDeleteBackend(TestFsBackend):
     def delete(self, name) -> None:
         if "stuck" in name:
             raise OSError("storage is unavailable")
+
+
+class SuccessfulDeleteBackend(TestFsBackend):
+    """Test backend that reports every object as deleted."""
+
+    def delete_many(self, names) -> dict[str, bool | Exception]:
+        return {name: True for name in names}
+
+    def delete(self, name) -> None:
+        pass
 
 
 class JobStrategyTests(TestCase):
@@ -204,6 +220,15 @@ class DeletionWorkerClaimTests(TestCase):
         self.assertIsNone(claimed)
 
     def test_claim_returns_none_for_empty_queue(self) -> None:
+        claimed = DeletionWorker()._claim_job("test-host:1")
+
+        self.assertIsNone(claimed)
+
+    def test_claim_ignores_job_scheduled_in_the_future(self) -> None:
+        job = self._create_job()
+        job.scheduled_at = now() + timedelta(minutes=5)
+        job.save(update_fields=("scheduled_at",))
+
         claimed = DeletionWorker()._claim_job("test-host:1")
 
         self.assertIsNone(claimed)
@@ -740,8 +765,8 @@ class DeletionWorkerStorageFailureTests(TestCase):
         self.user = UserFactory(storage=self.storage)
         self.root = FsNodeDirectoryFactory(name="root", owner=self.user, storage=self.storage)
 
-    def test_storage_failure_keeps_the_database_row_for_retry(self) -> None:
-        """A failed storage delete must not be silently treated as a successful deletion."""
+    def test_storage_failure_keeps_outbox_for_retry(self) -> None:
+        """A failed storage delete leaves an outbox row, not an orphan object."""
         node = FsNodeFileFactory(
             name="stuck.txt",
             file="stuck.txt",
@@ -755,10 +780,15 @@ class DeletionWorkerStorageFailureTests(TestCase):
         run_worker()
 
         job.refresh_from_db()
-        self.assertEqual(job.status, FsNodeDeletionJob.Status.FAILED)
-        self.assertIn("storage is unavailable", job.last_error)
-        self.assertTrue(FsNode.objects.filter(pk=node.pk).exists())
-        self.assertIsNotNone(FsNode.objects.get(pk=node.pk).deleted_at)
+        self.assertEqual(job.status, FsNodeDeletionJob.Status.DONE)
+        self.assertFalse(FsNode.objects.filter(pk=node.pk).exists())
+
+        outbox = PendingObjectDeletion.objects.get(
+            storage_id=self.storage.pk,
+            object_key="stuck.txt",
+        )
+        self.assertEqual(outbox.attempts, 1)
+        self.assertIn("storage is unavailable", outbox.last_error)
 
     def test_storage_failure_does_not_block_healthy_storage_nodes(self) -> None:
         """Files from healthy storage are removed even if another storage fails."""
@@ -789,9 +819,21 @@ class DeletionWorkerStorageFailureTests(TestCase):
         run_worker()
 
         job.refresh_from_db()
-        self.assertEqual(job.status, FsNodeDeletionJob.Status.FAILED)
+        self.assertEqual(job.status, FsNodeDeletionJob.Status.DONE)
         self.assertFalse(FsNode.objects.filter(name="healthy.txt", deletion_job=job).exists())
-        self.assertTrue(FsNode.objects.filter(pk=stuck_file.pk).exists())
+        self.assertFalse(FsNode.objects.filter(pk=stuck_file.pk).exists())
+        self.assertFalse(
+            PendingObjectDeletion.objects.filter(
+                storage_id=healthy_storage.pk,
+                object_key="healthy.txt",
+            ).exists()
+        )
+        self.assertTrue(
+            PendingObjectDeletion.objects.filter(
+                storage_id=self.storage.pk,
+                object_key="stuck.txt",
+            ).exists()
+        )
 
     # def test_partial_storage_failure_deletes_only_successful_files(self) -> None:
     #     """Only FsNode rows for successfully deleted files are removed from DB."""
@@ -825,6 +867,122 @@ class DeletionWorkerStorageFailureTests(TestCase):
     #     self.assertEqual(job.status, FsNodeDeletionJob.Status.FAILED)
     #     self.assertFalse(FsNode.objects.filter(pk=ok_file.pk).exists())
     #     self.assertTrue(FsNode.objects.filter(pk=stuck_file.pk).exists())
+
+
+class DeletionWorkerProtectionTests(TestCase):
+    """Deletion must back off while an archive manifest still references a node."""
+
+    def setUp(self) -> None:
+        self.storage = FsStorage.objects.create(
+            name="Protecting storage",
+            backend=get_storage_path(SuccessfulDeleteBackend),
+            options={},
+        )
+        fs_storages.clear()
+        self.addCleanup(fs_storages.clear)
+        self.user = UserFactory(storage=self.storage)
+        self.root = FsNodeDirectoryFactory(name="root", owner=self.user, storage=self.storage)
+        self.file = FsNodeFileFactory(
+            name="protected.txt",
+            file="protected.txt",
+            owner=self.user,
+            storage=self.storage,
+            parent=self.root,
+            size=5,
+        )
+        self.item = FsNodeArchiveItemFactory(node=self.file)
+
+    def test_protected_file_reschedules_job_without_touching_rows_or_outbox(self) -> None:
+        job = remove_fs_node(self.user, PurePosixPath("/root"))
+
+        run_worker()
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, FsNodeDeletionJob.Status.PENDING)
+        self.assertEqual(job.attempts, 0)
+        self.assertGreater(job.scheduled_at, now())
+        self.assertIsNone(job.locked_until)
+        self.assertIn("FsNodeArchiveItem.node", job.last_error)
+        self.assertTrue(FsNode.objects.filter(pk=self.file.pk).exists())
+        self.assertFalse(PendingObjectDeletion.objects.exists())
+
+    def test_job_completes_after_protection_is_removed(self) -> None:
+        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        run_worker()
+        job.refresh_from_db()
+        self.assertEqual(job.status, FsNodeDeletionJob.Status.PENDING)
+
+        self.item.delete()
+        FsNodeDeletionJob.objects.filter(pk=job.pk).update(
+            scheduled_at=now() - timedelta(seconds=1),
+        )
+
+        run_worker()
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, FsNodeDeletionJob.Status.DONE)
+        self.assertFalse(FsNode.objects.filter(pk=self.file.pk).exists())
+        self.assertFalse(PendingObjectDeletion.objects.exists())
+
+
+class DeletionWorkerOutboxTests(TestCase):
+    """The outbox must be drained independently from deletion jobs."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.storage = FsStorage.objects.create(
+            name="Outbox storage",
+            backend=get_storage_path(FileSystemBackend),
+            options={"location": self.temp_dir.name, "upload_to": ""},
+        )
+        fs_storages.clear()
+        self.addCleanup(fs_storages.clear)
+
+    def test_outbox_is_drained_without_a_deletion_job(self) -> None:
+        Path(self.temp_dir.name, "orphan.txt").write_bytes(b"orphan")
+        PendingObjectDeletion.objects.create(
+            storage_id=self.storage.pk,
+            object_key="orphan.txt",
+        )
+
+        run_worker()
+
+        self.assertFalse(Path(self.temp_dir.name, "orphan.txt").exists())
+        self.assertFalse(PendingObjectDeletion.objects.exists())
+
+    def test_missing_object_is_treated_as_success(self) -> None:
+        PendingObjectDeletion.objects.create(
+            storage_id=self.storage.pk,
+            object_key="missing.txt",
+        )
+
+        run_worker()
+
+        self.assertFalse(PendingObjectDeletion.objects.exists())
+
+    def test_failed_outbox_entry_is_retried_on_next_run(self) -> None:
+        failing_storage = FsStorage.objects.create(
+            name="Failing outbox storage",
+            backend=get_storage_path(FailingDeleteBackend),
+            options={},
+        )
+        fs_storages.clear()
+        PendingObjectDeletion.objects.create(
+            storage_id=failing_storage.pk,
+            object_key="stuck.txt",
+        )
+
+        run_worker()
+
+        outbox = PendingObjectDeletion.objects.get(object_key="stuck.txt")
+        self.assertEqual(outbox.attempts, 1)
+        self.assertIn("storage is unavailable", outbox.last_error)
+
+        run_worker()
+
+        outbox.refresh_from_db()
+        self.assertEqual(outbox.attempts, 2)
 
 
 class DeletionWorkerTinyBatchTests(TestCase):

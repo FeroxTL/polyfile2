@@ -1,11 +1,20 @@
 import m from "mithril";
-import {ModalsAndBackdrop} from "../dashboard/bootstrap/modal";
+import {ModalsAndBackdrop, showModal} from "../dashboard/bootstrap/modal";
+import {ArchiveDownloadModal} from "@polyfile/core/components/ArchiveDownloadModal";
 import {FsNodeListView} from "@polyfile/core/components/FsNodeListView";
+import {FolderDownloadButton} from "@polyfile/core/components/FolderDownloadButton";
 import {ShareFsNodeList} from "./services/shareFsNodeList";
 import {SHARE_API_DETAIL_URL, SHARE_URL} from "./constants/endpoints";
 import {BreadcrumbsView} from "@polyfile/core/components/BreadcrumbsView";
 import {joinPath} from "@polyfile/core/utils/urls";
 import {ShareFsNodeActionbarView} from "./components/ShareFsNodeActionbarView";
+
+const openArchiveDownloadModal = (fsNode) => {
+  showModal(ArchiveDownloadModal, {
+    downloadUrl: fsNode.download_url,
+    name: fsNode.name,
+  });
+};
 
 
 const ShareDetailView = {
@@ -38,12 +47,17 @@ const ShareDetailView = {
           ? m(".card text-bg-dark sticky-top", m(".card-body p-2 ps-3", m(ShareFsNodeActionbarView, {
             selectedList,
             onClose: () => ShareFsNodeList.selectFsNode(),
+            onDownload: openArchiveDownloadModal,
           })))
           : m(BreadcrumbsView, {
             FsNodeList: ShareFsNodeList,
             getPublicUrl: (path) => m.buildPathname(SHARE_URL, {
               share_token: m.route.param("share_token"),
               key: path.replace(/^\/+/u, ""),
+            }),
+            actions: m(FolderDownloadButton, {
+              fsNode: ShareFsNodeList.current,
+              onDownload: openArchiveDownloadModal,
             }),
           }),
         m(FsNodeListView, {

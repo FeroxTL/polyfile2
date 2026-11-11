@@ -2,9 +2,10 @@ import m from "mithril";
 
 export const ShareFsNodeActionbarView = {
   view(vnode) {
-    const { selectedList, onClose } = vnode.attrs;
+    const { selectedList, onClose, onDownload } = vnode.attrs;
     const selectedItem = selectedList.length === 1 ? selectedList[0] : null;
     const canDownload = Boolean(selectedItem && selectedItem.download_url);
+    const isDirectory = selectedItem?.type === "directory";
 
     return m(".row app-ignore-selection", [
       m(".col py-2 text-nowrap overflow-hidden", m("span",
@@ -25,6 +26,16 @@ export const ShareFsNodeActionbarView = {
             disposition: "attachment",
           }),
           title: "Download",
+          onclick: (event) => {
+            if (!canDownload) {
+              event.preventDefault();
+              return;
+            }
+            if (isDirectory && onDownload) {
+              event.preventDefault();
+              onDownload(selectedItem);
+            }
+          },
         }, [
           m("span.fa fa-download[aria-hidden=true]"),
           " ",

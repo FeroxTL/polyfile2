@@ -27,8 +27,10 @@ POLYFILE_DATA_DIR=/var/lib/polyfile
 ```
 
 `POLYFILE_DATA_DIR` holds the SQLite database (unless `DATABASE_URL` is set), collected
-static files, and media. It must be writable by the service user and must survive package
-upgrades. See [Building a distribution](packaging.md#what-goes-where) for the layout.
+static files, media, and directory archives. It must be writable by the service user and
+must survive package upgrades. The development default is `./local`; always set an
+absolute path in production. See [Building a distribution](packaging.md#what-goes-where)
+for the layout.
 
 ## Database
 
@@ -98,6 +100,32 @@ uv run python manage.py run_deletion_worker
 
 Run this as a managed process (systemd, supervisor, Docker, etc.). Without it, deletions are accepted but never
 completed.
+
+Directory archives are built by a second worker:
+
+```bash
+polyfile run_archive_worker
+# or, in a source checkout:
+uv run python manage.py run_archive_worker
+```
+
+The archive worker writes ZIPs under `ARCHIVE_ROOT` (default
+`<POLYFILE_DATA_DIR>/archives`). For nginx delivery, expose that directory as an internal
+location and set `ARCHIVE_ACCEL_PREFIX`:
+
+```nginx
+location /_archives/ {
+    internal;
+    alias /var/lib/polyfile/archives/;
+}
+```
+
+```env
+ARCHIVE_ACCEL_PREFIX=/_archives/
+```
+
+When `ARCHIVE_ACCEL_PREFIX` is empty, Django streams the ZIP with `FileResponse`; this is
+convenient for development but does not support `Range` requests.
 
 ## Security hardening
 

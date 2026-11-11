@@ -6,6 +6,8 @@ from pathlib import Path
 from django.urls import reverse_lazy
 from environ import environ
 
+from polyfile.core.utils import parse_duration, parse_size
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BASE_DIR.parent
@@ -15,12 +17,17 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
     INTERNAL_IPS=(list, ['127.0.0.1']),
 )
+
 ENV_FILE = Path(os.environ.get("POLYFILE_ENV_FILE", Path.cwd() / ".env")).expanduser()
 environ.Env.read_env(ENV_FILE)
 
-# Runtime data (database, collected static, media) must not live inside the package:
-# a wheel is installed into site-packages, which may be read-only and is replaced on upgrade.
-DATA_DIR = Path(env.str("POLYFILE_DATA_DIR", str(Path.cwd()))).expanduser().resolve()
+# Runtime data (database, collected static, media, archives) must not live inside
+# the package: a wheel is installed into site-packages, which may be read-only and
+# is replaced on upgrade. Keep the current working directory clean by defaulting
+# to ./local; the source repository ignores that directory.
+DATA_DIR = Path(
+    env.str("POLYFILE_DATA_DIR", str(Path.cwd() / "local")),
+).expanduser().resolve()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # MkDocs output is built into the package and shipped with distributions.
@@ -179,6 +186,21 @@ STORAGES = {
 STATICFILES_DIRS = tuple(
     path for path in (WEBPACK_ASSETS_DIR,) if Path(path).exists()
 )
+
+# Directory archives
+ARCHIVE_ROOT = Path(env.str('ARCHIVE_ROOT', str(DATA_DIR / 'archives'))).expanduser()
+# Fail fast at startup if the archive directory cannot be created. Individual
+# archive keys still create their own subdirectories lazily in the backend.
+ARCHIVE_ROOT.mkdir(parents=True, exist_ok=True)
+ARCHIVE_ACCEL_PREFIX = env.str('ARCHIVE_ACCEL_PREFIX', '')
+DIRECTORY_ARCHIVE_MAX_FILES = env.int('DIRECTORY_ARCHIVE_MAX_FILES', 10_000)
+DIRECTORY_ARCHIVE_MAX_SIZE = parse_size(
+    env.str('DIRECTORY_ARCHIVE_MAX_SIZE', '10GB'),
+)
+DIRECTORY_ARCHIVE_TTL = parse_duration(
+    env.str('DIRECTORY_ARCHIVE_TTL', '24h'),
+)
+DIRECTORY_ARCHIVE_RETRY_AFTER = env.int('DIRECTORY_ARCHIVE_RETRY_AFTER', 2)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

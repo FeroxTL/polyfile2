@@ -56,6 +56,8 @@ class SharedNode(models.Model):
     objects = models.Manager()
     active = ActiveShareNodeManager()
 
+    root_fs_node_id: uuid.UUID | None
+
     def __str__(self):
         return f"{self.root_fs_node} ({self.token})"
 

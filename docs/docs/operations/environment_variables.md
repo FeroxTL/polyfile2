@@ -15,15 +15,30 @@ default; use `POLYFILE_ENV_FILE` to point to another file.
 
 ## Runtime Paths
 
-| Variable            | Type   | Default                      | Description                                                            |
-|---------------------|--------|------------------------------|------------------------------------------------------------------------|
-| `POLYFILE_DATA_DIR` | `path` | current working directory    | Root for the SQLite database, collected static files, and media.       |
-| `POLYFILE_ENV_FILE` | `path` | `<cwd>/.env`                 | Path to the `.env` file loaded at startup.                             |
-| `STATIC_ROOT`       | `path` | `<POLYFILE_DATA_DIR>/static` | Destination for `collectstatic`. Serve this directory in production.   |
-| `MEDIA_ROOT`        | `path` | `<POLYFILE_DATA_DIR>/media`  | Default media root. Actual file storage is configured per `FsStorage`. |
+| Variable            | Type   | Default                      | Description                                                                 |
+|---------------------|--------|------------------------------|-----------------------------------------------------------------------------|
+| `POLYFILE_DATA_DIR` | `path` | `<cwd>/local`                | Root for the SQLite database, static files, media, and directory archives.  |
+| `POLYFILE_ENV_FILE` | `path` | `<cwd>/.env`                 | Path to the `.env` file loaded at startup.                                  |
+| `STATIC_ROOT`       | `path` | `<POLYFILE_DATA_DIR>/static` | Destination for `collectstatic`. Serve this directory in production.        |
+| `MEDIA_ROOT`        | `path` | `<POLYFILE_DATA_DIR>/media`  | Default media root. Actual file storage is configured per `FsStorage`.      |
 
 Runtime data must stay outside `site-packages`; otherwise package upgrades can overwrite it
-and the package directory may be read-only.
+and the package directory may be read-only. The default `<cwd>/local` keeps the working
+directory clean; set `POLYFILE_DATA_DIR` to an absolute, persistent path in production.
+
+## Directory Archives
+
+Directory downloads are built asynchronously into a ZIP archive. Archives are stored outside
+`MEDIA_ROOT`/`FsStorage` so they keep a separate lifecycle and access policy.
+
+| Variable                        | Type   | Default                        | Description                                                                |
+|---------------------------------|--------|--------------------------------|----------------------------------------------------------------------------|
+| `ARCHIVE_ROOT`                  | `path` | `<POLYFILE_DATA_DIR>/archives` | Local directory for built ZIP archives.                                    |
+| `ARCHIVE_ACCEL_PREFIX`          | `str`  | empty (Django `FileResponse`)  | nginx `X-Accel-Redirect` prefix, for example `/_archives/`.                |
+| `DIRECTORY_ARCHIVE_TTL`         | `str`  | `24h`                          | Hard lifetime of a ready archive (`30s`, `15m`, `24h`, `7d`).              |
+| `DIRECTORY_ARCHIVE_MAX_FILES`   | `int`  | `10000`                        | Maximum number of files in one directory archive.                          |
+| `DIRECTORY_ARCHIVE_MAX_SIZE`    | `str`  | `10GB`                         | Maximum total source size in one directory archive (`512MB`, `10GB`). Units are binary (`1KB` = 1024B). |
+| `DIRECTORY_ARCHIVE_RETRY_AFTER` | `int`  | `2`                            | `Retry-After`/polling interval in seconds while an archive is being built. |
 
 ## Debug Toolbar
 

@@ -62,7 +62,7 @@ class FileSystemBackend(FileSystemStorage, FsBackendBase):
         super().__init__(*args, **kwargs)
 
     def download_url(self, instance: models.Model) -> str:
-        """Generate a URL for downloading a file."""
+        """Point at the authorized download view instead of a raw media URL."""
         return reverse('download_file', kwargs={
             'pk': instance.pk,
         })
