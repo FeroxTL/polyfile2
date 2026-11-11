@@ -37,7 +37,7 @@ directory tree without holding an HTTP request open for minutes.
   delete files or empty directories. Built with Mithril.js and Bootstrap 5.
 - **Path-based REST API** — list nodes and their children, create directories, initiate uploads, delete subtrees,
   and poll deletion jobs. See the [API reference](operations/api_reference.md).
-- **Backend-agnostic storage** — a common `FsBackendBase` contract with a reference local filesystem backend.
+- **Backend-agnostic storage** — a common `StorageBackend` contract with a reference local filesystem backend.
   Adding S3, FTP or another provider means implementing the backend, not changing the tree logic.
 - **Public shares** — time-limited and revocable shares, signed download URLs, and a `ShareDownload` audit log of
   IP address, user agent and timestamp.

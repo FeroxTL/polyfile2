@@ -1,6 +1,4 @@
 import factory
-from django.db import models
-from django.http.request import HttpRequest
 
 from polyfile.apps.accounts.factories import UserFactory
 from polyfile.apps.storage.models import (
@@ -10,18 +8,35 @@ from polyfile.apps.storage.models import (
     FsStorage,
     PendingObjectDeletion,
 )
-from polyfile.contrib.backends.base import FsBackendBase
+from polyfile.contrib.backends.base import StorageBackend
 from polyfile.contrib.backends.utils import get_storage_path
 
 
-class TestFsBackend(FsBackendBase):
+class TestFsBackend(StorageBackend):
     """Backend for testing the storage backend."""
 
-    def download_url(self, instance: models.Model) -> str:
-        return "/test/url/"
+    name = "Test storage"
 
-    def save_file(self, fs_node: models.Model, request: HttpRequest) -> None:
+    def __init__(self, **kwargs):
+        self.options = kwargs
+
+    def open(self, name: str, mode: str = "rb"):
+        raise NotImplementedError
+
+    def save(self, name: str, content):
         pass
+
+    def delete(self, name: str):
+        pass
+
+    def exists(self, name: str):
+        return False
+
+    def size(self, name: str):
+        return 0
+
+    def download_url(self, instance) -> str:
+        return "/test/url/"
 
 
 class StorageFactory(factory.django.DjangoModelFactory):

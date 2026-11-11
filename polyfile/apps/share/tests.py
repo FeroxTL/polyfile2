@@ -1,9 +1,9 @@
 import tempfile
 import uuid
 from datetime import timedelta
+from io import BytesIO
 from unittest import mock
 
-from django.core.files.base import ContentFile
 from django.http.response import StreamingHttpResponse
 from django.test import TestCase
 from django.urls import reverse
@@ -21,6 +21,7 @@ from polyfile.apps.storage.factories import (
     FsNodeFileFactory,
     StorageFactory,
 )
+from polyfile.apps.storage.handler import fs_storages
 from polyfile.apps.storage.models import FsNode
 from polyfile.contrib.backends.file_system_backend.backend import FileSystemBackend
 from polyfile.contrib.backends.utils import get_storage_path
@@ -56,7 +57,9 @@ class ShareBaseTest(TestCase):
             storage=self.storage,
             parent=self.root_dir,
         )
-        self.child_file.file.save("notes.txt", ContentFile(b"hello"), save=True)
+        self.child_file.object_key = "notes.txt"
+        self.child_file.save(update_fields=["object_key"])
+        fs_storages[self.child_file.storage_id].save("notes.txt", BytesIO(b"hello"))
         self.child_dir = FsNodeDirectoryFactory(
             name="nested",
             owner=self.owner,
@@ -487,7 +490,9 @@ class ShareDetailApiTests(ShareBaseTest):
             storage=self.storage,
             parent=self.child_dir,
         )
-        nested_node.file.save("notes1.txt", ContentFile(b"hello"), save=True)
+        nested_node.object_key = "notes1.txt"
+        nested_node.save(update_fields=["object_key"])
+        fs_storages[nested_node.storage_id].save("notes1.txt", BytesIO(b"hello"))
 
         self.client.logout()
         response = self.client.get(self._api_url(share.token, f"/{self.child_dir.name}"))
@@ -512,7 +517,7 @@ class ShareDetailApiTests(ShareBaseTest):
                     {
                         "created_at": nested_node.created_at.isoformat(),
                         "download_url": mock.ANY,
-                        "file": nested_node.file.name,
+                        "file": nested_node.object_key,
                         "md5": nested_node.md5,
                         "mime_type": nested_node.mime_type,
                         "modified_at": nested_node.modified_at.isoformat(),

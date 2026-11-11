@@ -4,7 +4,7 @@ from django.apps.registry import apps
 from django.core.files.storage import InvalidStorageError, StorageHandler
 from django.utils.functional import cached_property
 
-from polyfile.contrib.backends.base import FsBackendBase
+from polyfile.contrib.backends.base import StorageBackend
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,10 @@ class FsStorageHandler(StorageHandler):
         self.__dict__.pop("backends", None)
 
 
-def register_backend(storage_cls: type[FsBackendBase]) -> None:
+def register_backend(storage_cls: type[StorageBackend]) -> None:
     """Register storage backend."""
-    if not issubclass(storage_cls, FsBackendBase):
-        raise InvalidStorageError(f"Invalid backend class {storage_cls!r}: must subclass BaseStorageBackend")
+    if not issubclass(storage_cls, StorageBackend):
+        raise InvalidStorageError(f"Invalid backend class {storage_cls!r}: must subclass StorageBackend")
 
     backend = f"{storage_cls.__module__}.{storage_cls.__name__}"
 
@@ -53,4 +53,4 @@ def register_backend(storage_cls: type[FsBackendBase]) -> None:
 
 
 fs_storages = FsStorageHandler()
-registered_backends: dict[str, type[FsBackendBase]] = {}
+registered_backends: dict[str, type[StorageBackend]] = {}

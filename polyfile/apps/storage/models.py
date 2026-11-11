@@ -2,7 +2,6 @@ import typing
 import uuid
 
 from django.conf import settings
-from django.core import exceptions
 from django.db import models
 from django.db.models import Q
 from django.utils.timezone import now
@@ -111,7 +110,18 @@ class PendingObjectDeletion(models.Model, StandardModelType["PendingObjectDeleti
 
 class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
     """Base fields for ancestors."""
-    file = model_fields.FsStorageFileField(
+    # Real DB column that stores the object key inside the selected storage.
+    # Historically this column is named ``file`` in the database.
+    object_key = models.CharField(
+        verbose_name="Object key",
+        max_length=1024,
+        blank=True,
+        db_column="file",
+    )
+    # Synthetic composite attribute backed by ``storage_id`` + ``object_key``.
+    file = model_fields.FileRefField(
+        storage_id_field="storage_id",
+        object_key_field="object_key",
         verbose_name="File",
         blank=True,
     )
@@ -156,9 +166,9 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
     @property
     def storage_object(self) -> StorageObjectRef | None:
         """Return this node's physical object, or ``None`` when nothing was uploaded."""
-        if self.storage_id is None or not self.file.name:
+        if self.storage_id is None or not self.object_key:
             return None
-        return StorageObjectRef(self.storage_id, self.file.name)
+        return StorageObjectRef(self.storage_id, self.object_key)
 
     @property
     def path(self) -> str:
@@ -179,9 +189,8 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
 
     def delete(self, using=None, keep_parents=False) -> tuple[int, dict[str, int]]:
         """Delete associated file while deleting node instance."""
-        # todo: post_delete
         result = super().delete(using=using, keep_parents=keep_parents)
-        self.file.delete(save=False)
+        self.file.delete()
         return result
 
 
@@ -290,10 +299,6 @@ class FsNode(AbstractFsNode):
 
         if self.is_directory:
             self.file = None
-        elif self.is_file and not self.file:
-            raise exceptions.ValidationError({
-                "file": "Required",  # TODO: specify error text
-            })
 
 
 class FsNodeArchiveJob(models.Model, StandardModelType["FsNodeArchiveJob"]):
@@ -357,6 +362,8 @@ class FsNodeArchiveJob(models.Model, StandardModelType["FsNodeArchiveJob"]):
             ),
         ]
 
+    items: models.QuerySet["FsNodeArchiveItem"]
+
     def __str__(self) -> str:
         return f"ArchiveJob {self.pk} ({self.status})"
 
@@ -389,6 +396,12 @@ class FsNodeArchiveItem(models.Model, StandardModelType["FsNodeArchiveItem"]):
     # An empty object_key marks a directory or a file node that was never uploaded.
     object_key = models.CharField(max_length=255, blank=True)
     storage_id = models.BigIntegerField(null=True, blank=True, db_index=True)
+    file = model_fields.FileRefField(
+        storage_id_field="storage_id",
+        object_key_field="object_key",
+        verbose_name="File",
+        blank=True,
+    )
     size = models.PositiveBigIntegerField(default=0)
     md5 = models.CharField(max_length=32, blank=True)
     modified_at = models.DateTimeField(null=True, blank=True)

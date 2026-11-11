@@ -69,7 +69,7 @@ def _load_subtree(root: FsNode) -> list[dict]:
                 "parent_id",
                 "name",
                 "type",
-                "file",
+                "object_key",
                 "storage_id",
                 "size",
                 "md5",
@@ -127,8 +127,8 @@ def build_manifest_entries(rows: list[dict], root: FsNode) -> list[ManifestEntry
             zip_path = f"{prefix}{row['name']}/" if is_directory else f"{prefix}{row['name']}"
             _validate_zip_path(zip_path)
             storage_object = None
-            if not is_directory and row["file"]:
-                storage_object = StorageObjectRef(row["storage_id"], row["file"])
+            if not is_directory and row["object_key"]:
+                storage_object = StorageObjectRef(row["storage_id"], row["object_key"])
             entries.append(
                 ManifestEntry(
                     node_id=None if is_directory else row["pk"],

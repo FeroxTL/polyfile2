@@ -79,8 +79,12 @@ class FsNodeItemSchema(Schema):
     size = fields.Int(dump_only=True)
     mime_type = fields.Str(dump_only=True)
     md5 = fields.Str(dump_only=True)
-    file = fields.Str(dump_only=True)
+    file = fields.Method("get_file", dump_only=True)
     download_url = fields.Method('get_download_url', dump_only=True)
+
+    @staticmethod
+    def get_file(obj: FsNode) -> str:
+        return obj.object_key or ""
 
     @staticmethod
     def get_download_url(obj: FsNode) -> str:

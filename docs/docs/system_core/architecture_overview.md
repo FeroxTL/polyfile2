@@ -34,7 +34,7 @@ polyfile/
 ### Storage abstraction
 - **FsNode** - Core entity representing files and directories in a tree structure
 - **FsStorage** - Configuration for storage backends
-- **FsBackendBase** - Abstract base for all storage backends (extends Django's `Storage`)
+- **StorageBackend** - Abstract base for all storage backends
 - **FileSystemBackend** - Local filesystem implementation
 
 ## Design principles

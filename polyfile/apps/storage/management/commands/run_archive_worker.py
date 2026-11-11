@@ -22,7 +22,6 @@ from django.db import DatabaseError, models, transaction
 from django.utils.timezone import now
 
 from polyfile.apps.storage.archive_backend import get_archive_backend
-from polyfile.apps.storage.handler import fs_storages
 from polyfile.apps.storage.management.archive_job_strategies import (
     ArchiveStrategyFactory,
 )
@@ -214,13 +213,12 @@ class ArchiveWorker(BaseCommand):
             if index % self.cancel_check_interval == 0:
                 self._check_cancelled(job)
 
-            ref = item.storage_object
             if item.entry_type == FsNodeArchiveItem.EntryType.DIRECTORY:
                 info = zipfile.ZipInfo(item.zip_path)
                 info.compress_type = zipfile.ZIP_STORED
                 info.external_attr = (0o40755 << 16) | 0x10
                 archive.writestr(info, b"")
-            elif ref is None:
+            elif not item.file:
                 # A file node that was created but never uploaded is still an
                 # empty file in the snapshot.
                 archive.writestr(item.zip_path, b"")
@@ -229,8 +227,7 @@ class ArchiveWorker(BaseCommand):
                 # Use the manifest snapshot, not item.node.file: the node may
                 # have been re-uploaded or moved to another storage after the
                 # job was requested.
-                storage = fs_storages[ref.storage_id]
-                with storage.open(ref.key, "rb") as source, archive.open(
+                with item.file.open("rb") as source, archive.open(
                     item.zip_path,
                     "w",
                 ) as target:

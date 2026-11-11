@@ -1,68 +1,117 @@
-from collections.abc import Sequence
-from typing import Any
+"""Composite field that exposes a single ``file`` attribute backed by two DB columns.
 
-from django.db import models
-from django.db.models.fields.files import FieldFile
+The real data lives in ``storage_id`` (FK to ``FsStorage``) and ``object_key``
+(path inside the selected storage). ``FileRefField`` is a descriptor factory
+that returns ``FsNodeFileRef``.
+"""
 
-from polyfile.apps.storage import models as fs_models
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, BinaryIO
+
 from polyfile.apps.storage.handler import fs_storages
-from polyfile.contrib.backends.base import FsBackendBase
+from polyfile.contrib.backends.base import StorageBackend
+
+if TYPE_CHECKING:
+    from polyfile.apps.storage import models as fs_models
 
 
-class FsStorageFieldFile(FieldFile):
-    """File field with dynamic storage."""
-    instance: "fs_models.FsNode"  # TODO: define FsNodeProtocol here?
+class FsNodeFileRef:
+    """Reference to a physical file object: storage + key."""
 
-    def __init__(self, instance: "fs_models.FsNode", field: models.FileField, name: str):
-        super().__init__(instance, field, name)
-        # self.storage is None in non-existent nodes, like root node
-        self.storage: FsBackendBase | None = None
-        if instance.storage_id:
-            self.storage = fs_storages[instance.storage_id]
+    __slots__ = ("instance", "object_key", "storage_id")
 
-    def download_url(self) -> str:
-        """Public download URL for this node's file.
+    def __init__(self, instance: fs_models.FsNode, storage_id: int | None, object_key: str):
+        self.instance: fs_models.FsNode = instance
+        self.storage_id = storage_id
+        self.object_key = object_key
 
-        The backend decides what the URL is: the local backend points at the
-        authorized download view, while a cloud backend may return a signed
-        direct URL.
-        """
-        if self.storage:
-            return self.storage.download_url(self.instance)
-        return ""
+    def __bool__(self) -> bool:
+        return bool(self.object_key)
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"storage_id={self.storage_id}, object_key={self.object_key!r})"
+        )
 
     @property
-    def url(self) -> str:
-        """Django-compatible URL used by admin and form widgets.
+    def backend(self) -> StorageBackend | None:
+        if self.storage_id is None:
+            return None
+        return fs_storages[self.storage_id]
 
-        Delegates to :meth:`download_url` so ``FileField.url`` never leaks a
-        raw ``MEDIA_URL`` link. Returns an empty string for nodes without a
-        stored object or storage, which keeps admin rendering safe.
-        """
-        if (
-            not self.name
-            or not isinstance(self.storage, FsBackendBase)
-            or self.instance._state.adding
-            or not self.instance.pk
-        ):
+    def open(self, mode: str = "rb") -> BinaryIO:
+        """Open the physical file."""
+        backend = self.backend
+        if backend is None:
+            raise RuntimeError("Cannot open file: storage_id is not set")
+        return backend.open(self.object_key, mode)
+
+    def delete(self) -> None:
+        """Delete the physical file."""
+        backend = self.backend
+        if backend is None or not self.object_key:
+            return
+        backend.delete(self.object_key)
+
+    def download_url(self) -> str:
+        """Return a URL that can be used to download the file."""
+        backend = self.backend
+        if backend is None or not self.object_key:
             return ""
-        return self.download_url()
+        return backend.download_url(self.instance)
 
 
-class FsStorageFileField(models.FileField):
-    """File field with dynamic storage selection (based on FsNode storage)."""
-    attr_class = FsStorageFieldFile
-    # TODO: set default_storage here to return error on any upload
+class FsNodeFileDescriptor:
+    """Descriptor that returns/sets an ``FsNodeFileRef``."""
 
-    def pre_save(self, model_instance: "fs_models.FsNode", add: bool):
-        """Pre-save hook for field."""
-        storage = fs_storages[model_instance.storage_id]
-        model_instance.file.storage = self.storage = storage
-        return super().pre_save(model_instance, add)
+    def __init__(self, storage_id_field: str, object_key_field: str):
+        self.storage_id_field = storage_id_field
+        self.object_key_field = object_key_field
 
-    def deconstruct(self) -> tuple[str, str, Sequence[Any], dict[str, Any]]:
-        """Get rid of some fields in django migrations."""
-        name, path, args, kwargs = super().deconstruct()
-        for field_name in ("storage", "upload_to"):
-            kwargs.pop(field_name, None)
-        return name, path, args, kwargs
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+        storage_id = getattr(instance, self.storage_id_field)
+        object_key = getattr(instance, self.object_key_field) or ""
+        return FsNodeFileRef(instance, storage_id, object_key)
+
+    def __set__(self, instance, value: FsNodeFileRef | None):
+        if value is None:
+            setattr(instance, self.object_key_field, "")
+        elif isinstance(value, FsNodeFileRef):
+            setattr(instance, self.storage_id_field, value.storage_id)
+            setattr(instance, self.object_key_field, value.object_key)
+        else:
+            raise TypeError(
+                f"Expected FsNodeFileRef or None, got {type(value).__name__}"
+            )
+
+
+class FileRefField:
+    """Descriptor factory that exposes a composite ``file`` attribute.
+
+    The actual columns are declared separately (e.g. ``storage_id`` and
+    ``object_key``). This class is **not** a Django ``Field``; it exists only
+    in Python and is invisible to migrations, forms and the ORM.
+    """
+
+    def __init__(self, storage_id_field: str, object_key_field: str, **kwargs):
+        self.storage_id_field = storage_id_field
+        self.object_key_field = object_key_field
+        self.editable = kwargs.get("editable", False)
+        self.blank = kwargs.get("blank", True)
+        self.verbose_name = kwargs.get("verbose_name", "")
+        self.name: str | None = None
+        self.attname: str | None = None
+
+    def contribute_to_class(self, cls, name: str, private_only: bool = False):
+        self.name = name
+        self.attname = name
+        descriptor = FsNodeFileDescriptor(self.storage_id_field, self.object_key_field)
+        setattr(cls, name, descriptor)
+
+    def __set_name__(self, owner, name):
+        self.name = name
+        self.attname = name

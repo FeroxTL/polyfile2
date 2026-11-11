@@ -50,7 +50,7 @@ python manage.py run_deletion_worker [--once] [--sleep SECONDS] [--batch-size N]
 
 ## Backend integration
 
-The deletion worker uses the backend for each node's storage via [FsBackendBase.delete_many()](storage_backends.md#abstraction-layer). This allows efficient bulk deletion and proper error reporting per file.
+The deletion worker uses the backend for each node's storage via [StorageBackend.delete_many()](storage_backends.md#abstraction-layer). This allows efficient bulk deletion and proper error reporting per file.
 
 ## Monitoring
 

@@ -1,112 +1,70 @@
-import hashlib
-import os
-import posixpath
-from collections.abc import Iterable
+"""Local filesystem storage backend for user files."""
 
-from django import http
-from django.conf import settings
+import os
+import shutil
+from pathlib import Path, PurePosixPath
+from typing import BinaryIO
+
 from django.core.exceptions import ValidationError
-from django.core.files.base import ContentFile
-from django.core.files.storage import FileSystemStorage
 from django.core.files.utils import validate_file_name
 from django.db import models
-from django.http import HttpRequest
-from django.http.multipartparser import MultiPartParserError
 from django.urls import reverse
-from django.utils.timezone import now
 
-from polyfile.apps.storage.models import FsNode
-from polyfile.apps.storage.utils import get_mime_type
-from polyfile.contrib.backends.base import FsBackendBase
+from polyfile.contrib.backends.base import StorageBackend
 
 
-class RawFileParser:
-    def __init__(self, request: http.HttpRequest):
-        """Initialize the RawFileParser object."""
-        # Content-Type should not contain multipart and the boundary information.
-        content_type = request.META.get("CONTENT_TYPE", "")
-        if content_type.startswith("multipart/"):
-            raise MultiPartParserError(f"Invalid Content-Type: {content_type}")
-
-        # Content-Length should contain the length of the body we are about
-        # to receive.
-        try:
-            content_length = int(request.META.get("CONTENT_LENGTH", 0))
-        except (ValueError, TypeError):
-            content_length = 0
-
-        if content_length < 0:
-            # This means we shouldn't continue...raise an error.
-            raise MultiPartParserError(f"Invalid content length: {content_length}")
-
-        self._encoding = settings.DEFAULT_CHARSET
-        self._content_length = content_length
-        self._input_data = request
-        self._chunk_size = min(x.chunk_size for x in request.upload_handlers)
-        self._upload_handlers = request.upload_handlers
-        self._meta = request.META
-
-    def read(self, chunk_size: int) -> bytes | None:
-        return self._input_data.read(chunk_size)
-
-
-class FileSystemBackend(FileSystemStorage, FsBackendBase):
+class FileSystemBackend(StorageBackend):
     """Stores files in a directory on the local device."""
-    chunk_size = 64 * 2 ** 10  # The default chunk size is 64 KB.
 
-    def __init__(self, location: str | None = None, upload_to: str = '', *args, **kwargs):
+    name = "Local file system"
+    chunk_size = 64 * 1024
+
+    def __init__(self, location: str | None = None, upload_to: str = "") -> None:
         if not location:
-            raise ValidationError({'location': 'This field is required!'})
-        self.base_location = location
+            raise ValidationError({"location": "This field is required!"})
+        self.root = Path(location).expanduser().resolve()
         self.upload_to = upload_to
-        super().__init__(*args, **kwargs)
+
+    def _path(self, name: str) -> Path:
+        """Resolve ``name`` inside the backend root and reject traversal."""
+        relative = PurePosixPath(validate_file_name(name, allow_relative_path=True))
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"Invalid object key: {name!r}")
+        path = (self.root / Path(*relative.parts)).resolve()
+        if not path.is_relative_to(self.root):
+            raise ValueError(f"Object key escapes the storage root: {name!r}")
+        return path
+
+    def open(self, name: str, mode: str = "rb") -> BinaryIO:
+        return self._path(name).open(mode)
+
+    def save(self, name: str, content) -> None:
+        """Atomically publish ``content`` under ``name``.
+
+        Writes to a ``.part`` file, fsyncs it, then replaces the target.
+        """
+        destination = self._path(name)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        partial = destination.with_name(destination.name + ".part")
+        try:
+            with partial.open("wb") as target:
+                shutil.copyfileobj(content, target, length=self.chunk_size)
+                target.flush()
+                os.fsync(target.fileno())
+            os.replace(partial, destination)
+        except BaseException:
+            partial.unlink(missing_ok=True)
+            raise
+
+    def delete(self, name: str) -> None:
+        self._path(name).unlink(missing_ok=True)
+        self._path(name).with_name(Path(name).name + ".part").unlink(missing_ok=True)
+
+    def exists(self, name: str) -> bool:
+        return self._path(name).is_file()
+
+    def size(self, name: str) -> int:
+        return self._path(name).stat().st_size
 
     def download_url(self, instance: models.Model) -> str:
-        """Point at the authorized download view instead of a raw media URL."""
-        return reverse('download_file', kwargs={
-            'pk': instance.pk,
-        })
-
-    def delete_many(self, names: Iterable[str]) -> dict[str, bool | Exception]:
-        results: dict[str, bool | Exception] = {}
-        for name in names:
-            path = self.path(name)
-            try:
-                os.unlink(path)
-            except FileNotFoundError:
-                results[name] = True
-            except OSError as exc:
-                results[name] = exc
-            else:
-                results[name] = True
-        return results
-
-    def save_file(self, fs_node: FsNode, request: HttpRequest) -> None:
-        """Save request into file."""
-        # Generate filename
-        dirname = now().strftime(self.upload_to)
-        filename = posixpath.join(dirname, fs_node.name)
-        filename = validate_file_name(filename, allow_relative_path=True)
-
-        # Create empty file
-        fs_node.file.save(filename, ContentFile(''), save=False)
-        fs_node.save(update_fields=('file', 'modified_at'))
-
-        # File content is in request.body
-        parser = RawFileParser(request=request)
-
-        file_size = 0
-        hash_md5 = hashlib.md5()
-        with fs_node.file.open('wb') as file_obj:
-            while chunk := parser.read(self.chunk_size):
-                file_obj.write(chunk)
-                hash_md5.update(chunk)
-                file_size += len(chunk)
-
-        fs_node.size = file_size
-        fs_node.md5 = hash_md5.hexdigest()
-
-        with fs_node.file.open('rb') as file_obj:
-            fs_node.mime_type = get_mime_type(file_obj)
-
-        fs_node.save(update_fields=('size', 'md5', 'mime_type'))
+        return reverse("download_file", kwargs={"pk": instance.pk})

@@ -159,7 +159,7 @@ class ArchiveModelTests(TestCase):
         )
 
     def test_fsnode_storage_object_uses_the_uploaded_file(self) -> None:
-        node = FsNodeFileFactory(file="uploads/1/file.txt")
+        node = FsNodeFileFactory(object_key="uploads/1/file.txt")
 
         self.assertEqual(
             node.storage_object,
@@ -167,6 +167,6 @@ class ArchiveModelTests(TestCase):
         )
 
     def test_fsnode_storage_object_is_none_without_an_upload(self) -> None:
-        node = FsNodeFileFactory(file="")
+        node = FsNodeFileFactory(object_key="")
 
         self.assertIsNone(node.storage_object)

@@ -713,7 +713,7 @@ class DeletionWorkerStorageTests(TestCase):
         path.write_bytes(content)
         return FsNodeFileFactory(
             name=name,
-            file=name,
+            object_key=name,
             owner=self.user,
             storage=self.storage,
             parent=parent or self.root,
@@ -738,7 +738,7 @@ class DeletionWorkerStorageTests(TestCase):
         """Verify missing file handling."""
         node = FsNodeFileFactory(
             name="already-gone.txt",
-            file="already-gone.txt",
+            object_key="already-gone.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.root,
@@ -769,7 +769,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
         """A failed storage delete leaves an outbox row, not an orphan object."""
         node = FsNodeFileFactory(
             name="stuck.txt",
-            file="stuck.txt",
+            object_key="stuck.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.root,
@@ -800,7 +800,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
         fs_storages.clear()
         FsNodeFileFactory(
             name="healthy.txt",
-            file="healthy.txt",
+            object_key="healthy.txt",
             owner=self.user,
             storage=healthy_storage,
             parent=self.root,
@@ -808,7 +808,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
         )
         stuck_file = FsNodeFileFactory(
             name="stuck.txt",
-            file="stuck.txt",
+            object_key="stuck.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.root,
@@ -845,7 +845,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
     #     fs_storages.clear()
     #     ok_file = FsNodeFileFactory(
     #         name="ok.txt",
-    #         file="ok.txt",
+    #         object_key="ok.txt",
     #         owner=self.user,
     #         storage=partial_storage,
     #         parent=self.root,
@@ -853,7 +853,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
     #     )
     #     stuck_file = FsNodeFileFactory(
     #         name="stuck.txt",
-    #         file="stuck.txt",
+    #         object_key="stuck.txt",
     #         owner=self.user,
     #         storage=partial_storage,
     #         parent=self.root,
@@ -884,7 +884,7 @@ class DeletionWorkerProtectionTests(TestCase):
         self.root = FsNodeDirectoryFactory(name="root", owner=self.user, storage=self.storage)
         self.file = FsNodeFileFactory(
             name="protected.txt",
-            file="protected.txt",
+            object_key="protected.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.root,

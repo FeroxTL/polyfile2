@@ -86,7 +86,7 @@ class ArchiveApiTestBase(TestCase):
         path.write_bytes(content)
         return FsNodeFileFactory(
             name=name,
-            file=relative_path,
+            object_key=relative_path,
             owner=self.user,
             storage=self.storage,
             parent=parent,

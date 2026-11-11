@@ -1,38 +1,46 @@
+"""Base interface for per-node storage backends."""
+
+from abc import ABC, abstractmethod
 from collections.abc import Iterable
+from typing import BinaryIO
 
-from django.core.files.storage import Storage
 from django.db import models
-from django.http import HttpRequest
 
 
-class FsBackendBase(Storage):
-    """Base class for all types backends."""
-    name = None
+class StorageBackend(ABC):
+    """Minimal backend interface for user files.
 
-    def download_url(self, instance: models.Model) -> str:
-        """Return a URL for downloading ``instance``.
+    Implementations must provide local/S3/... access without relying on
+    Django's file-upload forms or public URL semantics.
+    """
 
-        Backends choose the representation: an authorized application view URL
-        for local storage, or a signed direct URL for cloud storage. The
-        instance is required because storage-relative names do not identify the
-        owning ``FsNode``.
-        """
-        raise NotImplementedError
+    name: str | None = None
 
-    def save_file(self, fs_node: models.Model, request: HttpRequest) -> None:
-        """Save a file to the backend. Must be implemented by subclasses."""
-        raise NotImplementedError
+    @abstractmethod
+    def open(self, name: str, mode: str = "rb") -> BinaryIO:
+        """Open an existing object."""
+
+    @abstractmethod
+    def save(self, name: str, content) -> None:
+        """Save ``content`` (a file-like object) under ``name``."""
+
+    @abstractmethod
+    def delete(self, name: str) -> None:
+        """Delete an object. Missing objects are ignored."""
+
+    @abstractmethod
+    def exists(self, name: str) -> bool:
+        """Return whether the object exists."""
+
+    @abstractmethod
+    def size(self, name: str) -> int:
+        """Return object size in bytes."""
 
     def delete_many(self, names: Iterable[str]) -> dict[str, bool | Exception]:
-        """Bulk delete files and report per-file results.
+        """Bulk delete and report per-object results.
 
-        Default implementation deletes files one by one via :meth:`delete`.
-        Subclasses may override this with a more efficient bulk operation.
-
-        Returns a mapping of ``{name: result}``. A result of ``True`` means the
-        file was successfully removed (or did not exist). Any other value
-        indicates a failure and is typically an ``Exception`` describing the
-        problem.
+        A result of ``True`` means the object was removed or did not exist.
+        Any other value indicates a failure, usually an ``Exception``.
         """
         results: dict[str, bool | Exception] = {}
         for name in names:
@@ -43,3 +51,11 @@ class FsBackendBase(Storage):
             else:
                 results[name] = True
         return results
+
+    def download_url(self, instance: models.Model) -> str:
+        """Return a URL for downloading ``instance``.
+
+        Empty string means "no direct/public URL"; the view layer should serve
+        the file itself.
+        """
+        return ""

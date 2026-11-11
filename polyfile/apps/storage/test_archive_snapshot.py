@@ -49,7 +49,7 @@ class ArchiveSnapshotTests(TestCase):
         )
         self.file1 = FsNodeFileFactory(
             name="a.txt",
-            file="uploads/a/a.txt",
+            object_key="uploads/a/a.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.root,
@@ -58,7 +58,7 @@ class ArchiveSnapshotTests(TestCase):
         )
         self.file2 = FsNodeFileFactory(
             name="b.txt",
-            file="uploads/b/b.txt",
+            object_key="uploads/b/b.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.subdir,
@@ -110,7 +110,7 @@ class ArchiveSnapshotTests(TestCase):
     def test_manifest_marks_a_never_uploaded_file_as_having_no_object(self) -> None:
         FsNodeFileFactory(
             name="empty.txt",
-            file="",
+            object_key="",
             owner=self.user,
             storage=self.storage,
             parent=self.root,
@@ -129,7 +129,7 @@ class ArchiveSnapshotTests(TestCase):
 
         FsNodeFileFactory(
             name="new.txt",
-            file="uploads/new/new.txt",
+            object_key="uploads/new/new.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.root,
@@ -193,7 +193,7 @@ class ArchiveSnapshotTests(TestCase):
 
         FsNodeFileFactory(
             name="new.txt",
-            file="uploads/new/new.txt",
+            object_key="uploads/new/new.txt",
             owner=self.user,
             storage=self.storage,
             parent=self.root,
