@@ -17,8 +17,6 @@ const CLASS_NAME_START = 'carousel-item-start'
 const CLASS_NAME_NEXT = 'carousel-item-next'
 const CLASS_NAME_PREV = 'carousel-item-prev'
 
-let isSliding = false;
-
 function Point(x, y) {
   this.x = x;
   this.y = y;
@@ -87,7 +85,7 @@ const ImageViewerButton = {
         class: vnode.attrs.class,
         onclick: (e) => {
           e.preventDefault();
-          if (!isSliding) {
+          if (!vnode.attrs.isSliding) {
             vnode.attrs.slide();
           }
         },
@@ -140,6 +138,7 @@ const ImageViewerModal = {
     vnode.state.prevDiff = -1;
     vnode.state.initialScale = 0;
     vnode.state.wasZoomed = false;
+    vnode.state.isSliding = false;
   },
 
   // Get current image element. Can return non-img element if image not valid.
@@ -161,20 +160,22 @@ const ImageViewerModal = {
     currentMove.y = checkImgFits(currentImgEl.offsetHeight * currentScale, parentElementEl.offsetHeight, currentMove.y);
   },
 
-  // Slide to previous/next image
+  // Slide to previous/next image. Returns true when a slide actually starts.
   slide(vnode, isNext) {
     const {currentMove, images, itemsEl} = vnode.state;
     const currentIndex = images.indexOf(vnode.state.currentImg);
     const nextIndex = getNextElementIndex(images.length, currentIndex, isNext);
 
-    if (currentIndex === nextIndex) {return}
+    if (currentIndex === nextIndex) {
+      return false;
+    }
 
     currentMove.y = 0;
     vnode.state.currentScale = 1;
 
     if (checkAnimationsDisabled()) {
       vnode.state.currentImg = images[nextIndex];
-      return;
+      return true;
     }
 
     // Carousel elements (not images)
@@ -183,11 +184,12 @@ const ImageViewerModal = {
     const directionalClassName = isNext ? CLASS_NAME_START : CLASS_NAME_END
     const orderClassName = isNext ? CLASS_NAME_NEXT : CLASS_NAME_PREV
 
-    isSliding = true;
+    vnode.state.isSliding = true;
     nextElement.classList.add(orderClassName)
     reflow(nextElement)
     activeElement.classList.add(directionalClassName)
     nextElement.classList.add(directionalClassName)
+    return true;
   },
 
   setCurrentScale(vnode, newScale) {
@@ -212,7 +214,7 @@ const ImageViewerModal = {
     );
     evCache.splice(index, 1);
 
-    if (evCache.length === 0 && !isSliding) {
+    if (evCache.length === 0 && !vnode.state.isSliding) {
       const currentImgEl = this.getCurrentImgEl(vnode);
       if (!currentImgEl) {return}
       const parentHeight = currentImgEl.parentElement.offsetHeight;
@@ -220,7 +222,10 @@ const ImageViewerModal = {
 
       if (currentHeight <= parentHeight) {
         if (Math.abs(currentMove.x) > SLIDE_OFFSET && !vnode.state.wasZoomed) {
-          this.slide(vnode, currentMove.x < 0);
+          const hasSlid = this.slide(vnode, currentMove.x < 0);
+          if (!hasSlid) {
+            currentMove.x = 0;
+          }
         } else {
           currentMove.x = 0;
         }
@@ -240,7 +245,7 @@ const ImageViewerModal = {
     const {currentScale, currentImg} = vnode.state;
     if (!currentImg.is_valid) {return}
 
-    if (!isSliding) {
+    if (!vnode.state.isSliding) {
       this.setCurrentScale(vnode, ev.deltaY > 0 ? currentScale - WHEEL_ZOOM : currentScale + WHEEL_ZOOM)
     }
   },
@@ -259,7 +264,7 @@ const ImageViewerModal = {
     const {evCache, currentScale, prevDiff, prevMove, initialEvPos, currentMove, currentImg} = vnode.state;
 
     // If one pointer is down - move image
-    if (evCache.length === 1 && !isSliding) {
+    if (evCache.length === 1 && !vnode.state.isSliding) {
       const currentImgEl = this.getCurrentImgEl(vnode);
       const parentElementEl = currentImgEl.parentElement;
 
@@ -279,7 +284,7 @@ const ImageViewerModal = {
     evCache[index] = ev;
 
     // Multitouch handling
-    if (evCache.length === 2 && !isSliding) {
+    if (evCache.length === 2 && !vnode.state.isSliding) {
       // Ignore invalid images
       if (!currentImg.is_valid) {return}
 
@@ -304,14 +309,14 @@ const ImageViewerModal = {
   imgTransitionEnd(vnode, image, ev) {
     // If transform (sliding) is complete we should check if image has changed
     if (
-      isSliding
+      vnode.state.isSliding
       && ev.propertyName === "transform"
       && ev.target.classList.contains("carousel-item")
       && vnode.state.currentImg !== image
     ) {
       vnode.state.currentImg = image;
       // Reset variables
-      isSliding = false;
+      vnode.state.isSliding = false;
       vnode.state.currentMove.x = 0;
       vnode.state.currentMove.y = 0;
       vnode.state.currentScale = MIN_SCALE;
@@ -327,7 +332,7 @@ const ImageViewerModal = {
             m(".modal-header position-absolute top-0 start-0 w-100 z-1 bg-white bg-opacity-75", {
               class: vnode.state.currentScale > 1 ? "d-none" : null,
             }, [
-              m("span.modal-title", isSliding && m.trust("&nbsp;") || vnode.state.currentImg.fs_node.name),
+              m("span.modal-title", vnode.state.isSliding && m.trust("&nbsp;") || vnode.state.currentImg.fs_node.name),
               m(Modal.modalCloseButton, vnode.attrs),
             ]),
             m(".modal-body",
@@ -355,11 +360,11 @@ const ImageViewerModal = {
                       currentScale: vnode.state.currentScale,
                     }))
                   )),
-                  m(ImageViewerButton, {slide: () => this.slide(vnode, false), class: "carousel-control-prev"}, [
+                  m(ImageViewerButton, {slide: () => this.slide(vnode, false), isSliding: vnode.state.isSliding, class: "carousel-control-prev"}, [
                     m("span.carousel-control-prev-icon[aria-hidden=true]"),
                     m("span.visually-hidden", "Previous"),
                   ]),
-                  m(ImageViewerButton, {slide: () => this.slide(vnode, true), class: "carousel-control-next"}, [
+                  m(ImageViewerButton, {slide: () => this.slide(vnode, true), isSliding: vnode.state.isSliding, class: "carousel-control-next"}, [
                     m("span.carousel-control-next-icon[aria-hidden=true]"),
                     m("span.visually-hidden", "Next"),
                   ]),
