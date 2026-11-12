@@ -1,0 +1,8 @@
+# Perf harness artifacts
+runs/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.venv/

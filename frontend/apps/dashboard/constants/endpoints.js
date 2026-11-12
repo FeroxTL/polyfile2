@@ -7,7 +7,7 @@ const API_V1_FSNODE = "/api/v1/fs-node/",
   API_V1_SHARE_PERMANENT_DELETE = "/api/shares/:share_token/delete",
   API_V1_SHARE_REVOKE = "/api/shares/:share_token/revoke",
   DEFAULT_ROOT_URL = "/files",
-  FILES_DASHBOARD_URL = "/files:key...",
+  FILES_DASHBOARD_URL = "/files:path...",
   SHARES_DASHBOARD_URL = "/shares";
 
 export {

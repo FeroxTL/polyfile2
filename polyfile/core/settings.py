@@ -35,6 +35,9 @@ DOCS_DIR = BASE_DIR / "docs"
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env.str('SECRET_KEY', 'django-insecure-o_d=g9_#sofs^h8p34x5!$$gkdlqtk_2@-#0kw%gx2off@13&!')
+# Separate pepper for API-key hashes. Defaults to SECRET_KEY for a zero-config
+# setup; set it explicitly in production to allow rotating API keys separately.
+API_KEY_HASH_KEY = env.str('API_KEY_HASH_KEY', SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG')
@@ -42,6 +45,7 @@ TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
 LOGIN_URL = reverse_lazy('accounts-login')
+LOGIN_REDIRECT_URL = LOGIN_URL
 
 # Application definition
 INSTALLED_APPS = [
@@ -83,6 +87,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'polyfile.apps.accounts.auth.ApiKeyAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

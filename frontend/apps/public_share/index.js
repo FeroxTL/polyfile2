@@ -1,5 +1,6 @@
-import ShareDetailComponent from "./ShareDetailView";
 import m from "mithril";
+import {SHARE_URL} from "./constants/endpoints";
+import {loadData, ShareDetailView} from "./ShareDetailView";
 
 // This behavior is supported by backend
 m.route.prefix = "";
@@ -11,5 +12,10 @@ m.route(document.body, "/error", {
       return m("div", "That's an error")
     }
   },
-  "/s/:share_token/:key...": ShareDetailComponent,
+  [SHARE_URL]: {
+    onmatch: (args) => {
+      loadData(args);
+      return ShareDetailView;
+    }
+  },
 })

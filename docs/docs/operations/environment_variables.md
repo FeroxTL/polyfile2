@@ -9,6 +9,7 @@ default; use `POLYFILE_ENV_FILE` to point to another file.
 | Variable        | Type   | Default                                    | Description                                                                              |
 |-----------------|--------|--------------------------------------------|------------------------------------------------------------------------------------------|
 | `SECRET_KEY`    | `str`  | `django-insecure-string`                   | Secret key used for cryptographic signing. **Must be changed in production.**            |
+| `API_KEY_HASH_KEY` | `str` | `SECRET_KEY`                             | Pepper for API-key HMAC digests. Set separately to rotate keys independently.            |
 | `DEBUG`         | `bool` | `True` if `runserver` is in `sys.argv`     | Enables debug mode. In production, set to `False` and configure `ALLOWED_HOSTS`.         |
 | `ALLOWED_HOSTS` | `list` | `['localhost', '127.0.0.1']`               | List of allowed host/domain names. When `DEBUG=False`, this must be properly configured. |
 | `DATABASE_URL`  | `str`  | `sqlite:///<POLYFILE_DATA_DIR>/db.sqlite3` | Database connection URL. Supports SQLite, PostgreSQL, MySQL, and others.                 |

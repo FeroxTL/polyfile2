@@ -16,6 +16,24 @@ Key aspects:
 - **Routes**: Account URLs are included from `apps.accounts.urls`. Public auth forms are used (not the Django admin login for end users).
 - **Logout**: Available via API endpoint `/api/v1/user/logout/` ([API reference](../operations/api_reference.md)).
 - **Session-based auth**: Standard Django authentication is used; APIs assert `request.user.is_authenticated`.
+- **API keys**: Non-session clients can send `Authorization: Bearer pf_...` or
+  `X-API-Key: pf_...`. A valid key authenticates the request as its owner; an
+  invalid, expired or revoked key returns `401` without falling back to a
+  session.
+
+## API keys
+
+`ApiKey` stores only a short public `prefix` and an HMAC-SHA256 digest of the
+full token. The plaintext token is returned exactly once when the key is
+created. Create keys from a management command:
+
+```bash
+polyfile create_api_key --username alice --name nightly --expires-in 30d
+```
+
+Use `--json` for machine-readable output. Keys can be inspected and revoked in
+the Django admin. Set `API_KEY_HASH_KEY` to a separate secret in production so
+key hashes can be rotated independently of `SECRET_KEY`.
 
 ## Storage requirements for file operations
 

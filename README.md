@@ -46,6 +46,59 @@ uv run python manage.py run_deletion_worker
 
 Recursive deletion is handled by the background worker. Without it, deletion jobs are accepted but stay pending.
 
+## Testing
+
+### Unit and integration tests
+
+```bash
+# Django backend tests
+uv run python manage.py test --noinput --failfast
+
+# Frontend unit tests with vitest
+cd frontend
+npm run test:coverage
+```
+
+### Browser end-to-end tests
+
+E2E tests run a real Chromium browser against a live Django server. They live in
+`test_suites/browser_tests/` and use `pytest-playwright` + `pytest-django` with the dedicated
+`polyfile.core.settings_e2e` settings module.
+
+First, install the Playwright browser binaries (one-time):
+
+```bash
+uv run playwright install chromium
+```
+
+Run the full E2E suite (rebuilds production frontend assets automatically):
+
+```bash
+make e2e
+# or directly:
+uv run pytest test_suites/browser_tests -v --browser chromium
+```
+
+For faster local iteration when frontend assets are already built:
+
+```bash
+make e2e-fast
+# or directly:
+set SKIP_FRONTEND_BUILD=1 && uv run pytest test_suites/browser_tests -v --browser chromium
+```
+
+Run a single test file:
+
+```bash
+uv run pytest test_suites/browser_tests/test_login.py -v --browser chromium
+```
+
+Run with a visible browser window (headed mode):
+
+```bash
+uv run pytest test_suites/browser_tests -v --browser chromium --headed
+```
+
 ### From a wheel
 
 ```bash

@@ -93,7 +93,7 @@ describe("SharesDashboardView actions", () => {
     SharesDashboardView.navigateToNode(share);
 
     expect(set).toHaveBeenCalledWith(FILES_DASHBOARD_URL, {
-      key: "/root_dir/nested",
+      path: "/root_dir/nested",
     });
   });
 
@@ -108,7 +108,7 @@ describe("SharesDashboardView actions", () => {
     SharesDashboardView.navigateToNode(share);
 
     expect(set).toHaveBeenCalledWith(FILES_DASHBOARD_URL, {
-      key: "/root_dir/nested",
+      path: "/root_dir/nested",
     });
   });
 

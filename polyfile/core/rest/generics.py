@@ -1,11 +1,14 @@
 from django import http
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponseRedirect, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from marshmallow import ValidationError
 
 from polyfile.core.exceptions import FieldValidationError, HttpException, Unauthorized
+from polyfile.core.http import wants_html
 
 
 class AnonymousApiView(View):
@@ -34,5 +37,12 @@ class AnonymousApiView(View):
 class BaseApiView(LoginRequiredMixin, AnonymousApiView):
     """Base view for all api views."""
 
-    def handle_no_permission(self) -> http.HttpResponseRedirect:
-        raise Unauthorized
+    def handle_no_permission(self) -> HttpResponseRedirect | JsonResponse:
+        if wants_html(self.request):
+            return http.HttpResponseRedirect(settings.LOGIN_URL)
+
+        return http.JsonResponse({
+            "error_id": Unauthorized.error_code,
+            "description": Unauthorized.description,
+            "detail": Unauthorized.description,
+        }, status=Unauthorized.status_code)

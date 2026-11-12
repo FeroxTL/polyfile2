@@ -26,6 +26,10 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - Image preview in the SPA.
 - Logout from the SPA.
 - Storage settings forms in the Django admin.
+- Hashed API keys for non-session API clients, managed with the
+  `create_api_key` management command and the Django admin.
+- A standalone `test_suites/perf_tests/` load-testing harness (locust + httpx) with an API smoke
+  flow, a disk-usage guard and static HTML reports.
 
 ## Changed
 
@@ -37,10 +41,14 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 
 - Signed token signatures are verified with constant-time comparison.
 - Share access is validated against expiration, revocation and deleted nodes.
+- API keys are stored as HMAC-SHA256 digests; plaintext tokens are shown only once.
 
 ## Upgrade notes
 
 - Apply migrations: `polyfile migrate`.
+- API keys require the new `accounts.0003_apikey` migration. Set
+  `API_KEY_HASH_KEY` in production if key hashes should be rotated separately
+  from `SECRET_KEY`.
 - Run the deletion worker as a separate process: `polyfile run_deletion_worker`.
   `runserver` does not start it, and recursive deletions stay pending without it.
 - Public sharing depends on `SECRET_KEY`; keep it stable and secret, otherwise existing

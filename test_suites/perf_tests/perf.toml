@@ -1,0 +1,51 @@
+# Polyfile performance harness configuration.
+#
+# CLI flags override these values. Never commit a real API key here; keep it in
+# the environment variable named by `api_key_env` (POLYFILE_API_KEY by default).
+
+output_dir = "runs"
+
+[target]
+base_url = "http://127.0.0.1:8000"
+api_key_env = "POLYFILE_API_KEY"
+timeout = 30.0
+verify_tls = true
+
+[quota]
+# The guard only observes directories; it aborts the run when a limit is
+# exceeded so a load test cannot fill the disk.
+enabled = true
+data_dir = "local"          # relative to the repository root
+temp_dir = ""               # empty -> <data_dir>/tmp
+archive_dir = ""            # empty -> <data_dir>/archives
+max_temp_bytes = "512MB"
+max_archive_bytes = "1GB"
+max_total_bytes = "2GB"
+min_free_bytes = "2GB"
+poll_interval = 5.0
+
+[profiles.smoke]
+users = 1
+spawn_rate = 1.0
+duration = "10s"
+wait_min = 0.2
+wait_max = 0.5
+scenario = "mixed"
+
+[profiles.read]
+users = 20
+spawn_rate = 2.0
+duration = "1m"
+scenario = "read"
+
+[profiles.write]
+users = 10
+spawn_rate = 1.0
+duration = "1m"
+scenario = "write"
+
+[profiles.mixed]
+users = 20
+spawn_rate = 2.0
+duration = "2m"
+scenario = "mixed"

@@ -1,6 +1,6 @@
 // Bootstrap is already imported in "vendor" css
 import m from "mithril";
-import { API_V1_FSNODE, FILES_DASHBOARD_URL } from "./constants/endpoints";
+import { FILES_DASHBOARD_URL } from "./constants/endpoints";
 import { showModal } from "./bootstrap/modal";
 import RemoveFsNodeModalComponent from "./modals/remove_fsnode_modal";
 import { ShareDirectoryModal } from "./modals/share_directory_modal";
@@ -34,15 +34,11 @@ const openArchiveDownloadModal = (fsNode) => {
 
 const DashboardNavigationHandler = (path, name) => {
   m.route.set(FILES_DASHBOARD_URL, {
-    key: joinPath(path, name)
+    path: joinPath(path, name)
   });
 };
 
 const DashboardView = {
-  oninit(vnode) {
-    DashboardFsNodeList.load(API_V1_FSNODE, { path: vnode.attrs.key });
-  },
-
   view() {
     const selectedList = DashboardFsNodeList.elements.filter(item => item.selected);
 
@@ -58,7 +54,7 @@ const DashboardView = {
         : m(BreadcrumbsView, {
           FsNodeList: DashboardFsNodeList,
           getPublicUrl: (path) => m.buildPathname(FILES_DASHBOARD_URL, {
-            key: joinPath("/", path),
+            path: joinPath("/", path),
           }),
           actions: m(FolderDownloadButton, {
             fsNode: DashboardFsNodeList.current,

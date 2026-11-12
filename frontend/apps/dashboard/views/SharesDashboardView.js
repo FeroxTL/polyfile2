@@ -59,10 +59,10 @@ const SharesDashboardView = {
       return;
     }
     if (getNodeType(share) === "directory") {
-      m.route.set(FILES_DASHBOARD_URL, { key: path });
+      m.route.set(FILES_DASHBOARD_URL, { path });
       return;
     }
-    m.route.set(FILES_DASHBOARD_URL, { key: this.getParentPath(path) });
+    m.route.set(FILES_DASHBOARD_URL, { path: this.getParentPath(path) });
   },
 
   revokeShare(vnode, share) {

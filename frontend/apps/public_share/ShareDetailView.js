@@ -16,26 +16,21 @@ const openArchiveDownloadModal = (fsNode) => {
   });
 };
 
+export const loadData = (attrs) => (
+  ShareFsNodeList.load(m.buildPathname(SHARE_API_DETAIL_URL, {
+    share_token: attrs.share_token,
+    path: attrs.path,
+  }))
+);
 
-const ShareDetailView = {
-  oninit(vnode) {
-    this.loadData(vnode.attrs)
-  },
-
-  loadData(attrs) {
-    return ShareFsNodeList.load(m.buildPathname(SHARE_API_DETAIL_URL, {
-      share_token: attrs.share_token,
-      key: attrs.key,
-    }))
-  },
-
+export const ShareDetailView = {
   view(vnode) {
     const selectedList = ShareFsNodeList.elements.filter((item) => item.selected);
     const navigationHandler = (path, name) => {
       m.route.set(
         SHARE_URL, {
           share_token: m.route.param("share_token"),
-          key: joinPath(path, name).replace(/^\/+/u, ""),
+          path: joinPath(path, name).replace(/^\/+/u, ""),
         },
       );
     };
@@ -53,7 +48,7 @@ const ShareDetailView = {
             FsNodeList: ShareFsNodeList,
             getPublicUrl: (path) => m.buildPathname(SHARE_URL, {
               share_token: m.route.param("share_token"),
-              key: path.replace(/^\/+/u, ""),
+              path: path.replace(/^\/+/u, ""),
             }),
             actions: m(FolderDownloadButton, {
               fsNode: ShareFsNodeList.current,
@@ -62,7 +57,7 @@ const ShareDetailView = {
           }),
         m(FsNodeListView, {
           fsnodeList: ShareFsNodeList,
-          onRetry: () => {this.loadData(vnode.attrs)},
+          onRetry: () => {loadData(vnode.attrs)},
           navigationHandler
         }),
       ]),
@@ -72,5 +67,3 @@ const ShareDetailView = {
     ]);
   }
 }
-
-export default ShareDetailView;
