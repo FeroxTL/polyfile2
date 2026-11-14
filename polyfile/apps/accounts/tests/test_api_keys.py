@@ -182,7 +182,8 @@ class ApiKeyAuthenticationTests(ApiKeyTestBase):
 class ApiKeyUploadTests(ApiKeyTestBase):
     def test_touch_and_upload_work_without_session(self) -> None:
         touch_response = self.client.post(
-            reverse("fs_node_touch")  + "?path=/upload.txt",
+            reverse("fs_node_touch"),
+            data=json.dumps({"parent_id": None, "name": "upload.txt"}),
             content_type="application/json",
             **self.auth_headers(),
         )

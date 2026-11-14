@@ -4,9 +4,11 @@ import m from "mithril";
 import { DashboardFsNode } from "../../models/DashboardFsNode";
 import { DashboardFsNodeListService } from "../DashboardFsNodeList";
 
-const createService = (path = "/docs") => {
+const NODE_ID = "11111111-1111-1111-1111-111111111111";
+
+const createService = () => {
   const service = new DashboardFsNodeListService();
-  service.current = { path };
+  service.current = { id: "22222222-2222-2222-2222-222222222222" };
   return service;
 };
 
@@ -15,80 +17,75 @@ describe("DashboardFsNodeListService.createShare()", () => {
     vi.restoreAllMocks();
   });
 
-  it("encodes the target path and updates the node in place", async () => {
-    const share = {
+  it("creates a share by node id and updates the node in place", async () => {
+    const shareResponse = {
       id: "token",
       url: "https://example.com/s/token/",
+      expires_at: null,
     };
-    const request = vi.spyOn(m, "request").mockResolvedValue({ share });
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "report #1.txt" });
+    const request = vi.spyOn(m, "request").mockResolvedValue(shareResponse);
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "report #1.txt" });
 
     const data = await service.createShare(fsNode);
 
-    expect(request).toHaveBeenCalledWith("/api/shares/create/docs/report%20%231.txt", {
-      "body": {},
+    expect(request).toHaveBeenCalledWith("/api/shares/", {
+      body: { node_id: NODE_ID },
       method: "POST",
     });
-    expect(data.share).toEqual(share);
-    expect(fsNode.share).toEqual({ ...share, expires_at: null });
+    expect(data.id).toBe("token");
+    expect(fsNode.share).toEqual({
+      id: "token",
+      url: "https://example.com/s/token/",
+      expires_at: null,
+    });
     expect(fsNode.is_shared).toBe(true);
   });
 
   it("posts an expiration and stores it on the node", async () => {
-    const share = {
+    const expiresAt = "2030-01-02T03:04:00.000Z";
+    const request = vi.spyOn(m, "request").mockResolvedValue({
       id: "token",
       url: "https://example.com/s/token/",
-    };
-    const expiresAt = "2030-01-02T03:04:00.000Z";
-    const request = vi.spyOn(m, "request").mockResolvedValue({ share, expires_at: expiresAt });
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "file.txt" });
-
-    await service.createShare(fsNode, "/docs/file.txt", expiresAt);
-
-    expect(request).toHaveBeenCalledWith("/api/shares/create/docs/file.txt", {
-      method: "POST",
-      body: { expires_at: expiresAt },
+      expires_at: expiresAt,
     });
-    expect(fsNode.share).toEqual({ ...share, expires_at: expiresAt });
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "file.txt" });
+
+    await service.createShare(fsNode, expiresAt);
+
+    expect(request).toHaveBeenCalledWith("/api/shares/", {
+      method: "POST",
+      body: { node_id: NODE_ID, expires_at: expiresAt },
+    });
+    expect(fsNode.share).toEqual({
+      id: "token",
+      url: "https://example.com/s/token/",
+      expires_at: expiresAt,
+    });
   });
 
   it("sends null to clear an existing expiration", async () => {
     const request = vi.spyOn(m, "request").mockResolvedValue({
-      share: { id: "token", url: "https://example.com/s/token/" },
+      id: "token",
+      url: "https://example.com/s/token/",
       expires_at: null,
     });
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "file.txt" });
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "file.txt" });
 
-    await service.createShare(fsNode, "/docs/file.txt", null);
+    await service.createShare(fsNode, null);
 
-    expect(request).toHaveBeenCalledWith("/api/shares/create/docs/file.txt", {
+    expect(request).toHaveBeenCalledWith("/api/shares/", {
       method: "POST",
-      body: { expires_at: null },
-    });
-  });
-
-  it("uses an explicit path when provided", async () => {
-    const request = vi.spyOn(m, "request").mockResolvedValue({
-      share: { id: "token", url: "https://example.com/s/token/" },
-    });
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "file.txt" });
-
-    await service.createShare(fsNode, "/other/nested/file.txt");
-
-    expect(request).toHaveBeenCalledWith("/api/shares/create/other/nested/file.txt", {
-      body: {},
-      method: "POST",
+      body: { node_id: NODE_ID, expires_at: null },
     });
   });
 
   it("does not mark the node as shared when the request fails", async () => {
     vi.spyOn(m, "request").mockRejectedValue(new Error("network error"));
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "file.txt" });
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "file.txt" });
 
     await expect(service.createShare(fsNode)).rejects.toThrow("network error");
     expect(fsNode.share).toBeNull();
@@ -107,8 +104,8 @@ describe("DashboardFsNodeListService.revokeShare()", () => {
       url: "https://example.com/s/4c5e1f46-8e9a-4b7a-9e64-6d3f1c2a7b10/",
     };
     const request = vi.spyOn(m, "request").mockResolvedValue();
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "report.txt", share });
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "report.txt", share });
 
     await service.revokeShare(fsNode);
 
@@ -121,8 +118,8 @@ describe("DashboardFsNodeListService.revokeShare()", () => {
 
   it("does nothing when the node has no active share", async () => {
     const request = vi.spyOn(m, "request");
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "file.txt" });
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "file.txt" });
 
     await service.revokeShare(fsNode);
 
@@ -136,11 +133,44 @@ describe("DashboardFsNodeListService.revokeShare()", () => {
       url: "https://example.com/s/4c5e1f46-8e9a-4b7a-9e64-6d3f1c2a7b10/",
     };
     vi.spyOn(m, "request").mockRejectedValue(new Error("network error"));
-    const service = createService("/docs");
-    const fsNode = new DashboardFsNode({ name: "file.txt", share });
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "file.txt", share });
 
     await expect(service.revokeShare(fsNode)).rejects.toThrow("network error");
     expect(fsNode.share).toEqual(share);
     expect(fsNode.is_shared).toBe(true);
+  });
+});
+
+describe("DashboardFsNodeListService UUID preload", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("loads by UUID and consumes the matching route path once", async () => {
+    const request = vi.spyOn(m, "request").mockResolvedValue({
+      current: { id: NODE_ID, parent_id: null, name: "docs", type: "directory" },
+      ancestors: [],
+      children: [],
+    });
+    const service = new DashboardFsNodeListService();
+
+    await service.loadByNodeId(NODE_ID, "docs/");
+
+    expect(request).toHaveBeenCalledWith(
+      `/api/v1/fs-node/${NODE_ID}/`,
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(service.consumePendingPath("/docs")).toBe(true);
+    expect(service.consumePendingPath("/docs")).toBe(false);
+  });
+
+  it("does not skip a different route path", () => {
+    const service = new DashboardFsNodeListService();
+    service.pendingPath = "/docs";
+
+    expect(service.consumePendingPath("/other")).toBe(false);
+    // The marker is consumed even on a mismatch to avoid stale skips.
+    expect(service.consumePendingPath("/docs")).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import { NavLink } from "../bootstrap/navlink";
 import Collapse from "../bootstrap/collapse";
 import { uploadFile } from "../modals/uploader";
 import { showModal } from "../bootstrap/modal";
-import CreateDirectoryModal from "../modals/create_directory_modal";
+import { CreateDirectoryModal } from "../modals/create_directory_modal";
 
 // Navbar on the top - only for mobile (xs) devices
 export const DashboardMobileNavBarView = {

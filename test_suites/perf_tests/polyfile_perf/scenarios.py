@@ -3,8 +3,8 @@
 One ``HttpUser`` class keeps locust's task weighting and tagging simple. The
 active scenario is selected through ``PERF_SCENARIO`` and locust's ``--tags``.
 
-All endpoints are path-based: nodes are addressed by their logical path
-(``/api/v1/fs-node/?path=/...``), never by UUID.
+Reads stay path-based (``/api/v1/fs-node/?path=/...``); mutations address nodes
+by UUID (``parent_id`` + ``name``, ``DELETE .../<uuid>/``).
 """
 
 from __future__ import annotations
@@ -38,24 +38,25 @@ class PolyfileUser(HttpUser):
             self.client.headers["Authorization"] = f"Bearer {api_key}"
 
         self.work_dir_path: str | None = None
+        self.work_dir_id: str | None = None
         if SCENARIO == "read":
             return
 
-        path = f"/perf-{uuid.uuid4().hex[:10]}"
+        name = f"perf-{uuid.uuid4().hex[:10]}"
         response = self.client.post(
             "/api/v1/fs-node/mkdir",
-            params={"path": path},
+            json={"parent_id": None, "name": name},
             name="mkdir setup",
         )
         if response.status_code == 200:
-            self.work_dir_path = path
+            self.work_dir_path = f"/{name}"
+            self.work_dir_id = response.json()["id"]
 
     def on_stop(self) -> None:
         """Remove the working directory created in ``on_start``."""
-        if self.work_dir_path:
+        if self.work_dir_id:
             self.client.delete(
-                "/api/v1/fs-node/",
-                params={"path": self.work_dir_path},
+                f"/api/v1/fs-node/{self.work_dir_id}/",
                 name="delete setup",
             )
 
@@ -82,17 +83,18 @@ class PolyfileUser(HttpUser):
     @task(2)
     def mkdir_and_delete(self) -> None:
         """Create and immediately delete a directory."""
-        path = f"/perf-dir-{uuid.uuid4().hex[:10]}"
         response = self.client.post(
             "/api/v1/fs-node/mkdir",
-            params={"path": path},
+            json={
+                "parent_id": self.work_dir_id,
+                "name": f"perf-dir-{uuid.uuid4().hex[:10]}",
+            },
             name="mkdir",
         )
         if response.status_code != 200:
             return
         self.client.delete(
-            "/api/v1/fs-node/",
-            params={"path": path},
+            f"/api/v1/fs-node/{response.json()['id']}/",
             name="delete directory",
         )
 
@@ -100,12 +102,12 @@ class PolyfileUser(HttpUser):
     @task(2)
     def upload_and_delete(self) -> None:
         """Create a file, upload content and schedule its deletion."""
-        name = f"perf-file-{uuid.uuid4().hex[:10]}.bin"
-        path = f"{self.work_dir_path}/{name}" if self.work_dir_path else f"/{name}"
-
         response = self.client.post(
             "/api/v1/fs-node/touch",
-            params={"path": path},
+            json={
+                "parent_id": self.work_dir_id,
+                "name": f"perf-file-{uuid.uuid4().hex[:10]}.bin",
+            },
             name="touch",
         )
         if response.status_code != 200:
@@ -119,8 +121,7 @@ class PolyfileUser(HttpUser):
             name="upload",
         )
         self.client.delete(
-            "/api/v1/fs-node/",
-            params={"path": path},
+            f"/api/v1/fs-node/{data['id']}/",
             name="delete file",
         )
 
@@ -128,11 +129,12 @@ class PolyfileUser(HttpUser):
     @task(1)
     def share_and_revoke(self) -> None:
         """Create, read and revoke a public share for the working directory."""
-        if not self.work_dir_path:
+        if not self.work_dir_id:
             return
 
         response = self.client.post(
-            f"/api/shares/create{self.work_dir_path}",
+            "/api/shares/",
+            json={"node_id": self.work_dir_id},
             name="share create",
         )
         if response.status_code != 200:

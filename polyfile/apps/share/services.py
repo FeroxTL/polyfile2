@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from polyfile.apps.share.models import SharedNode
 from polyfile.apps.storage.archive import cancel_archive_jobs_for_root
-from polyfile.apps.storage.managers import get_user_fs_node_paths
 from polyfile.apps.storage.models import FsNode
 
 User = get_user_model()
@@ -105,13 +104,6 @@ def list_user_shares(
     paginator = Paginator(queryset.order_by("-created_at"), SHARE_LIST_PAGE_SIZE)
     paginator_page = paginator.get_page(page)
     items = list(paginator_page.object_list)
-
-    node_paths = get_user_fs_node_paths(
-        user=user,
-        node_ids=[item.root_fs_node_id for item in items],
-    )
-    for item in items:
-        item.root_fs_node.path = node_paths.get(item.root_fs_node_id)
 
     return items, paginator.count
 

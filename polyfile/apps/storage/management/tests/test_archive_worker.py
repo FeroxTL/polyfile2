@@ -23,6 +23,9 @@ from polyfile.apps.storage.management.archive_job_strategies import (
     RelationalArchiveClaimStrategy,
     SQLiteArchiveClaimStrategy,
 )
+from polyfile.apps.storage.management.commands.run_archive_worker import (
+    ArchiveWorker,
+)
 from polyfile.apps.storage.models import (
     FsNodeArchiveJob,
     FsStorage,
@@ -317,6 +320,21 @@ class ArchiveWorkerTests(TestCase):
         self.assertFalse(self._expected_key(job).exists())
         self.assertFalse(list(Path(self.archive_dir.name).rglob("*.part")))
         self.assertIn("a.txt", job.last_error)
+        self.assertNotIn(self.source_dir.name, job.last_error)
+
+    def test_missing_object_error_does_not_leak_server_paths(self) -> None:
+        job = create_archive_job(self.user, self.root)
+        Path(self.source_dir.name, "a.txt").unlink()
+
+        with self.assertLogs(LOGGER_NAME, level="ERROR"):
+            run_worker()
+
+        job.refresh_from_db()
+        self.assertEqual(
+            job.last_error,
+            'Archive source file is missing: "a.txt"',
+        )
+        self.assertNotIn(self.source_dir.name, job.last_error)
 
     def test_transient_storage_error_is_retried(self) -> None:
         job = create_archive_job(self.user, self.root)
@@ -419,3 +437,19 @@ class ArchiveWorkerTests(TestCase):
             run_worker()
 
         self.assertTrue(calls["allowZip64"])
+
+    def test_safe_error_message_strips_server_paths(self) -> None:
+        exc = FileNotFoundError(2, "No such file or directory", "C:\\srv\\media\\a.txt")
+
+        self.assertEqual(
+            ArchiveWorker._safe_error_message(exc),
+            "No such file or directory",
+        )
+        self.assertEqual(
+            ArchiveWorker._safe_error_message(OSError("storage is unavailable")),
+            "storage is unavailable",
+        )
+        self.assertEqual(
+            ArchiveWorker._safe_error_message(Exception("Max attempts exceeded")),
+            "Max attempts exceeded",
+        )

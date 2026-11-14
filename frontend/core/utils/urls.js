@@ -66,3 +66,21 @@ export function encodePath(path) {
     .map((segment) => encodeURIComponent(segment))
     .join("/");
 }
+
+/**
+ * Normalizes a path for comparisons: exactly one leading slash, no trailing
+ * slash and no repeated slashes.
+ *
+ * @param {string|null|undefined} path - The path to normalize.
+ * @returns {string} The normalized path, "/" for the root.
+ *
+ * @example
+ * // Returns "/root/sub"
+ * normalizePath("root//sub/");
+ */
+export function normalizePath(path) {
+  const segments = String(path ?? "")
+    .split("/")
+    .filter(Boolean);
+  return `/${segments.join("/")}`;
+}

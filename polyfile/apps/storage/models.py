@@ -59,7 +59,10 @@ class FsNodeDeletionJob(models.Model, StandardModelType['FsNodeDeletionJob']):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-    root_path = models.CharField(max_length=1024, blank=True)
+    # Snapshot of the deleted subtree root. The root row itself is removed by
+    # the worker, so the job keeps its identity for status reporting.
+    root_node_uuid = models.UUIDField(db_index=True)
+    root_node_name = models.CharField(max_length=255)
     status = models.CharField(max_length=16, choices=Status, default=Status.PENDING, db_index=True)
     total_nodes = models.PositiveIntegerField(default=0)
     processed_nodes = models.PositiveIntegerField(default=0)
@@ -157,11 +160,6 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
 
     storage_id: int | None
     owner_id: int | None
-    _path: str | None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._path = None
 
     @property
     def storage_object(self) -> StorageObjectRef | None:
@@ -169,23 +167,6 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
         if self.storage_id is None or not self.object_key:
             return None
         return StorageObjectRef(self.storage_id, self.object_key)
-
-    @property
-    def path(self) -> str:
-        """
-        Full path in Storage.
-
-        This property is only available in CTE selections (when query is annotated).
-        """
-        assert self._path is not None, (
-            f"No \"path\" attribute was provided using annotations "
-            f"({self.__class__.__name__}.objects.annotate(...)) or direct assignments."
-        )
-        return self._path
-
-    @path.setter
-    def path(self, value: str) -> None:
-        self._path = value
 
     def delete(self, using=None, keep_parents=False) -> tuple[int, dict[str, int]]:
         """Delete associated file while deleting node instance."""
@@ -394,7 +375,9 @@ class FsNodeArchiveItem(models.Model, StandardModelType["FsNodeArchiveItem"]):
     # through the `node` FK at build time on purpose: `FsNode.file` is mutable
     # (re-upload, replace, storage migration) and PROTECT only prevents deletion.
     # An empty object_key marks a directory or a file node that was never uploaded.
-    object_key = models.CharField(max_length=255, blank=True)
+    # The length matches FsNode.object_key: keys embed the node UUID (36 chars)
+    # plus the file name, so 255 is not enough for long file names.
+    object_key = models.CharField(max_length=1024, blank=True)
     storage_id = models.BigIntegerField(null=True, blank=True, db_index=True)
     file = model_fields.FileRefField(
         storage_id_field="storage_id",

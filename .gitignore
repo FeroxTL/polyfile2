@@ -19,6 +19,8 @@ local
 .codex
 coverage/
 .playwright-mcp/
+.vitest-secret-token
+npm-cache
 
 # build
 dist

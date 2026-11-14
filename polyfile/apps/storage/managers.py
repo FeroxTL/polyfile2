@@ -1,116 +1,134 @@
 import uuid
-from collections.abc import Iterable
 from functools import partial
 from pathlib import PurePosixPath
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import models
-from django.db.models.functions import Concat
 from django_cte import CTE, with_cte
 
 from polyfile.apps.storage.models import FsNode
 
 
-def make_fs_node_cte(cte: CTE, base_queryset: models.QuerySet, parent_fs_node: FsNode | None) -> models.QuerySet:
-    """
-    Construct a recursive Common Table Expression (CTE) for FsNode.
-
-    This function builds the base and recursive parts of the CTE. If `parent_fs_node` 
-    is provided, it restricts the starting set of nodes to the immediate children of 
-    that parent. Otherwise, it starts from the root nodes (nodes with no parent).
-
-    :param cte: The CTE object.
-    :param base_queryset: The QuerySet of FsNode objects to filter.
-    :param parent_fs_node: Optional parent FsNode. If set, only its children
-                             will be used as the root of the recursive expansion.
-    """
-    # non-recursive: get root nodes
-    qs = base_queryset
-    if parent_fs_node:
-        qs = qs.filter(parent=parent_fs_node)
-    else:
-        qs = qs.filter(parent__isnull=True)
-
-    return qs.values(
-        'id',
-        path=Concat(models.Value('/'), models.F('name')),
-    ).union(
-        # recursive union: get descendants
-        cte.join(base_queryset.model, parent_id=cte.col.id).values(
-            'id',
-            path=Concat(
-                cte.col.path, models.Value('/'), models.F('name'),
-                output_field=models.TextField(),
-            ),
-        ),
-        all=False,
-    )
-
-
-def get_user_fs_node_by_path(
+def get_fs_node_by_path_name(
         user: AbstractBaseUser,
         path: PurePosixPath,
         parent_fs_node: FsNode | None = None,
 ) -> FsNode | None:
     """
-    Retrieve an FsNode for a specific user and path.
+    Resolve a node by walking its path segments from a parent (or the root).
 
-    If `parent_fs_node` is provided, the search is restricted to the subtree 
-    of that parent node. The `path` argument should be relative to the 
-    parent's path in this context.
+    Each step is a single indexed lookup on ``(owner, parent, name)``, so the
+    cost is O(depth) instead of a recursive CTE over the whole tree.
 
     :param user: The AbstractBaseUser instance of the FsNode owner.
     :param path: The PurePosixPath to search for.
-    :param parent_fs_node: Optional FsNode. If provided, restricts the search to its descendants.
-    :return: The FsNode instance if found, otherwise None (for root path).
-    :raises FsNode.DoesNotExist: If no matching node is found in the subtree.
+    :param parent_fs_node: Optional FsNode. If provided, the search starts at
+                           its direct children (path is then relative to it).
+    :return: The FsNode instance if found, otherwise the parent (for "/").
+    :raises FsNode.DoesNotExist: If any segment does not resolve to a node.
     """
     if path == PurePosixPath('/'):
-        if parent_fs_node is not None:
-            parent_fs_node.path = "/"
         return parent_fs_node
 
-    cte = CTE.recursive(partial(
-        make_fs_node_cte,
-        base_queryset=FsNode.active.filter(owner=user),
-        parent_fs_node=parent_fs_node,
-    ))
-    return with_cte(
-        cte,
-        select=cte.join(FsNode, id=cte.col.id)
-        .annotate(path=cte.col.path)
-        .filter(path=path, owner=user)
-    ).get()
+    node = parent_fs_node
+    for name in path.parts[1:] if path.is_absolute() else path.parts:
+        lookup = {"owner": user, "name": name}
+        if node is None:
+            lookup["parent__isnull"] = True
+        else:
+            lookup["parent"] = node
+        node = FsNode.active.get(**lookup)
+    return node
 
 
-def get_user_fs_node_paths(
-        user: AbstractBaseUser,
-        node_ids: Iterable[uuid.UUID],
-) -> dict[uuid.UUID, str]:
+def make_fs_node_ancestor_cte(cte: CTE, base_queryset: models.QuerySet, node_id: uuid.UUID) -> models.QuerySet:
     """
-    Resolve full paths for a set of nodes owned by the given user.
+    Construct a recursive CTE that walks the parent chain upwards from a node.
 
-    This builds the same recursive CTE as :func:`get_user_fs_node_by_path`, but
-    returns a mapping so that a page of nodes can be resolved in a single query.
+    The base part is the node itself (depth 0); each recursive step adds its
+    parent with depth + 1. The chain naturally ends at a root (parent is NULL).
 
-    :param user: The AbstractBaseUser instance of the FsNode owner.
-    :param node_ids: Identifiers of the nodes to resolve.
-    :return: A mapping of node id to its full path. Unknown ids are omitted.
+    :param cte: The CTE object.
+    :param base_queryset: Owner-scoped QuerySet of active FsNode objects.
+    :param node_id: The UUID of the node to start from.
     """
-    node_ids = list(node_ids)
-    if not node_ids:
-        return {}
-
-    cte = CTE.recursive(partial(
-        make_fs_node_cte,
-        base_queryset=FsNode.active.filter(owner=user),
-        parent_fs_node=None,
-    ))
-    rows = with_cte(
-        cte,
-        select=cte.join(FsNode, id=cte.col.id)
-        .annotate(path=cte.col.path)
-        .filter(id__in=node_ids, owner=user)
-        .values("id", "path"),
+    qs = base_queryset.filter(id=node_id).values(
+        'id',
+        'parent_id',
+        depth=models.Value(0, output_field=models.IntegerField()),
     )
-    return {row["id"]: row["path"] for row in rows}
+
+    return qs.union(
+        cte.join(base_queryset, id=cte.col.parent_id).values(
+            'id',
+            'parent_id',
+            depth=cte.col.depth + models.Value(1),
+        ),
+        all=True,
+    )
+
+
+def get_fs_node_ancestors(
+        user: AbstractBaseUser,
+        node_id: uuid.UUID,
+        stop_at: uuid.UUID | None = None,
+) -> list[FsNode] | None:
+    """
+    Retrieve the ancestors of a node, ordered from the (sub)root to its parent.
+
+    When ``stop_at`` is given, the result is clipped to that subtree boundary:
+    it starts at the ``stop_at`` node and never exposes nodes above it (public
+    share scoping). ``stop_at`` itself is included, the node itself never is.
+
+    :param user: Node owner (defense-in-depth scoping).
+    :param node_id: The UUID of the node to find ancestors for.
+    :param stop_at: Optional subtree boundary (e.g. a share root UUID).
+    :return: List of ancestor FsNode objects (only ``id``/``name`` are loaded),
+             or None when ``stop_at`` is not on the parent chain, which means
+             the node lies outside the allowed subtree.
+    :raises FsNode.DoesNotExist: If the node does not exist or is not active.
+    """
+    cte = CTE.recursive(partial(
+        make_fs_node_ancestor_cte,
+        base_queryset=FsNode.active.filter(owner=user),
+        node_id=node_id,
+    ))
+    rows = list(with_cte(cte, select=cte.queryset().values('id', 'parent_id', 'depth')))
+    if not rows:
+        raise FsNode.DoesNotExist
+
+    # depth 0 is the node itself, the largest depth is the topmost ancestor.
+    ids = [row['id'] for row in sorted(rows, key=lambda row: row['depth'], reverse=True)]
+
+    if stop_at is not None:
+        if stop_at not in ids:
+            # The node is not a descendant of the allowed subtree root.
+            return None
+        ids = ids[ids.index(stop_at):]
+
+    # Drop the node itself.
+    ancestor_ids = ids[:-1]
+    if not ancestor_ids:
+        return []
+
+    by_id = {
+        node.id: node
+        for node in FsNode.objects.filter(id__in=ancestor_ids).only('id', 'name')
+    }
+    return [by_id[ancestor_id] for ancestor_id in ancestor_ids]
+
+
+def get_fs_node_by_id(
+        user: AbstractBaseUser,
+        node_id: uuid.UUID,
+) -> tuple[FsNode, list[FsNode]]:
+    """
+    Retrieve an active FsNode owned by the user by its UUID, with its ancestors.
+
+    :param user: Node owner (owner-scope is mandatory, lookups are IDOR-safe).
+    :param node_id: The UUID of the node.
+    :return: A tuple of the node and its ancestors (root first).
+    :raises FsNode.DoesNotExist: If the node is missing, foreign or tombstoned.
+    """
+    node: FsNode = FsNode.active.get(id=node_id, owner=user)
+    return node, get_fs_node_ancestors(user, node.pk)

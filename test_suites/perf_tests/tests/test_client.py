@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -40,25 +41,25 @@ def test_json_error_raises_polyfile_api_error() -> None:
     assert "Invalid API key" in exc_info.value.body
 
 
-def test_mkdir_and_touch_use_path_query_params() -> None:
+def test_mkdir_and_touch_post_parent_id_and_name() -> None:
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, json={"name": "node", "upload_url": "/upload/token/"})
+        return httpx.Response(200, json={"id": "node-id", "upload_url": "/upload/token/"})
 
     with make_client(handler) as client:
-        client.mkdir("/folder")
-        client.touch("/folder/file.txt")
+        client.mkdir("folder")
+        client.touch("file.txt", parent_id="folder-id")
 
     assert seen[0].method == "POST"
     assert seen[0].url.path == "/api/v1/fs-node/mkdir"
-    assert seen[0].url.params["path"] == "/folder"
+    assert json.loads(seen[0].content) == {"parent_id": None, "name": "folder"}
     assert seen[1].url.path == "/api/v1/fs-node/touch"
-    assert seen[1].url.params["path"] == "/folder/file.txt"
+    assert json.loads(seen[1].content) == {"parent_id": "folder-id", "name": "file.txt"}
 
 
-def test_delete_node_uses_path_query_param() -> None:
+def test_delete_node_uses_uuid_path() -> None:
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -66,15 +67,14 @@ def test_delete_node_uses_path_query_param() -> None:
         return httpx.Response(202, json={"job_id": "job-id", "status": "pending"})
 
     with make_client(handler) as client:
-        result = client.delete_node("/folder")
+        result = client.delete_node("11111111-1111-1111-1111-111111111111")
 
     assert seen[0].method == "DELETE"
-    assert seen[0].url.path == "/api/v1/fs-node/"
-    assert seen[0].url.params["path"] == "/folder"
+    assert seen[0].url.path == "/api/v1/fs-node/11111111-1111-1111-1111-111111111111/"
     assert result["job_id"] == "job-id"
 
 
-def test_create_share_posts_to_path_url() -> None:
+def test_create_share_posts_node_id() -> None:
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -82,11 +82,14 @@ def test_create_share_posts_to_path_url() -> None:
         return httpx.Response(200, json={"id": "share-id"})
 
     with make_client(handler) as client:
-        client.create_share("/folder", expires_at="2026-01-01T00:00:00Z")
+        client.create_share("11111111-1111-1111-1111-111111111111", expires_at="2026-01-01T00:00:00Z")
 
     assert seen[0].method == "POST"
-    assert seen[0].url.path == "/api/shares/create/folder"
-    assert seen[0].url.params["expires_at"] == "2026-01-01T00:00:00Z"
+    assert seen[0].url.path == "/api/shares/"
+    assert json.loads(seen[0].content) == {
+        "node_id": "11111111-1111-1111-1111-111111111111",
+        "expires_at": "2026-01-01T00:00:00Z",
+    }
 
 
 def test_upload_posts_raw_body() -> None:

@@ -8,50 +8,39 @@ describe("ShareService.create()", () => {
     vi.restoreAllMocks();
   });
 
-  it("creates a share for the given path", async () => {
+  it("creates a share for the given node id", async () => {
     const share = { id: "token", url: "https://example.com/s/token/" };
-    const request = vi.spyOn(m, "request").mockResolvedValue({ share });
+    const request = vi.spyOn(m, "request").mockResolvedValue(share);
 
-    const data = await ShareService.create("/docs/file.txt");
+    const data = await ShareService.create("11111111-1111-1111-1111-111111111111");
 
-    expect(request).toHaveBeenCalledWith("/api/shares/create/docs/file.txt", {
-      body: {},
+    expect(request).toHaveBeenCalledWith("/api/shares/", {
+      body: { node_id: "11111111-1111-1111-1111-111111111111" },
       method: "POST",
     });
-    expect(data.share).toEqual(share);
+    expect(data.id).toBe("token");
   });
 
   it("sends expiration when provided", async () => {
     const expiresAt = "2030-01-02T03:04:00.000Z";
     const request = vi.spyOn(m, "request").mockResolvedValue({});
 
-    await ShareService.create("/docs/file.txt", expiresAt);
+    await ShareService.create("11111111-1111-1111-1111-111111111111", expiresAt);
 
-    expect(request).toHaveBeenCalledWith("/api/shares/create/docs/file.txt", {
+    expect(request).toHaveBeenCalledWith("/api/shares/", {
       method: "POST",
-      body: { expires_at: expiresAt },
+      body: { node_id: "11111111-1111-1111-1111-111111111111", expires_at: expiresAt },
     });
   });
 
   it("sends null to clear an existing expiration", async () => {
     const request = vi.spyOn(m, "request").mockResolvedValue({});
 
-    await ShareService.create("/docs/file.txt", null);
+    await ShareService.create("11111111-1111-1111-1111-111111111111", null);
 
-    expect(request).toHaveBeenCalledWith("/api/shares/create/docs/file.txt", {
+    expect(request).toHaveBeenCalledWith("/api/shares/", {
       method: "POST",
-      body: { expires_at: null },
-    });
-  });
-
-  it("encodes special characters in the path", async () => {
-    const request = vi.spyOn(m, "request").mockResolvedValue({});
-
-    await ShareService.create("/docs/report #1.txt");
-
-    expect(request).toHaveBeenCalledWith("/api/shares/create/docs/report%20%231.txt", {
-      "body": {},
-      method: "POST",
+      body: { node_id: "11111111-1111-1111-1111-111111111111", expires_at: null },
     });
   });
 });

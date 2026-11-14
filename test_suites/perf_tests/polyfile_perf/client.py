@@ -171,13 +171,21 @@ class PolyfileClient:
 
     # -- writes ------------------------------------------------------------
 
-    def mkdir(self, path: str) -> dict[str, Any]:
-        """Create a directory at ``path`` and return its node data."""
-        return self._json("POST", "/api/v1/fs-node/mkdir", params={"path": path})
+    def mkdir(self, name: str, parent_id: str | None = None) -> dict[str, Any]:
+        """Create a directory ``name`` under ``parent_id`` and return its node data."""
+        return self._json(
+            "POST",
+            "/api/v1/fs-node/mkdir",
+            json={"parent_id": parent_id, "name": name},
+        )
 
-    def touch(self, path: str) -> dict[str, Any]:
-        """Create a file node at ``path`` and return its data plus ``upload_url``."""
-        return self._json("POST", "/api/v1/fs-node/touch", params={"path": path})
+    def touch(self, name: str, parent_id: str | None = None) -> dict[str, Any]:
+        """Create a file node and return its data plus ``upload_url``."""
+        return self._json(
+            "POST",
+            "/api/v1/fs-node/touch",
+            json={"parent_id": parent_id, "name": name},
+        )
 
     def upload(
         self,
@@ -194,17 +202,16 @@ class PolyfileClient:
             headers={"Content-Type": content_type},
         )
 
-    def delete_node(self, path: str) -> dict[str, Any]:
-        """Start asynchronous deletion of the node at ``path`` and its subtree."""
-        return self._json("DELETE", "/api/v1/fs-node/", params={"path": path})
+    def delete_node(self, node_id: str) -> dict[str, Any]:
+        """Start asynchronous deletion of the node by UUID and its subtree."""
+        return self._json("DELETE", f"/api/v1/fs-node/{node_id}/")
 
-    def create_share(self, path: str, expires_at: str | None = None) -> dict[str, Any]:
-        """Create or reactivate a public share for the node at ``path``."""
-        params: dict[str, str] = {}
+    def create_share(self, node_id: str, expires_at: str | None = None) -> dict[str, Any]:
+        """Create or reactivate a public share for the node UUID."""
+        body: dict[str, str] = {"node_id": node_id}
         if expires_at is not None:
-            params["expires_at"] = expires_at
-        url = "/api/shares/create" + quote(path, safe="/")
-        return self._json("POST", url, params=params or None)
+            body["expires_at"] = expires_at
+        return self._json("POST", "/api/shares/", json=body)
 
     def revoke_share(self, token: str) -> None:
         """Revoke a public share."""

@@ -40,6 +40,7 @@ class SmokeResult:
     """Aggregate smoke-flow result."""
 
     steps: list[SmokeStep] = field(default_factory=list)
+    directory_id: str | None = None
     directory_path: str | None = None
     file_path: str | None = None
     share_token: str | None = None
@@ -89,12 +90,13 @@ def run_smoke_flow(
             timer.detail = f"{len(root.get('children', []))} children"
 
         with step("mkdir") as timer:
-            client.mkdir(directory_path)
+            directory = client.mkdir(directory_name)
+            result.directory_id = str(directory["id"])
             result.directory_path = directory_path
             timer.detail = directory_path
 
         with step("touch") as timer:
-            node = client.touch(file_path)
+            node = client.touch(file_name, parent_id=result.directory_id)
             result.file_path = file_path
             upload_url = node["upload_url"]
             timer.detail = file_path
@@ -112,7 +114,7 @@ def run_smoke_flow(
             timer.detail = f"{len(children)} children"
 
         with step("share-create") as timer:
-            share = client.create_share(directory_path)
+            share = client.create_share(result.directory_id)
             result.share_token = str(share["id"])
             timer.detail = result.share_token
 
@@ -140,12 +142,12 @@ def _cleanup(
     delete_timeout: float,
 ) -> None:
     """Remove the smoke directory without masking the original failure."""
-    if result.directory_path is None:
+    if result.directory_id is None:
         return
 
     try:
         with step("delete-directory") as timer:
-            job = client.delete_node(result.directory_path)
+            job = client.delete_node(result.directory_id)
             result.cleanup_job_id = str(job["job_id"])
             timer.detail = result.cleanup_job_id
     except CLEANUP_ERRORS:

@@ -1,7 +1,6 @@
 import m from "mithril";
 
-import { encodePath } from "@polyfile/core/utils/urls";
-import { API_V1_SHARE_CREATE, API_V1_SHARE_REVOKE } from "../constants/endpoints";
+import { API_V1_SHARE_LIST, API_V1_SHARE_REVOKE } from "../constants/endpoints";
 
 /**
  * Low-level service for public share operations.
@@ -12,22 +11,20 @@ import { API_V1_SHARE_CREATE, API_V1_SHARE_REVOKE } from "../constants/endpoints
  */
 export const ShareService = {
   /**
-   * Create or update a public share for a node path.
+   * Create or update a public share for a node UUID.
    *
-   * @param {string} path - Full owner-relative node path.
+   * @param {string} nodeId - UUID of the node to share.
    * @param {string|null} [expiresAt] - ISO expiration timestamp, or null to clear.
-   * @returns {Promise<Object>} Backend response with { share, expires_at }.
+   * @returns {Promise<Object>} Backend response with { id, url, status, expires_at }.
    */
-  create(path, expiresAt) {
-    const body = {};
+  create(nodeId, expiresAt) {
+    const body = { node_id: nodeId };
 
     if (typeof expiresAt !== "undefined") {
       body.expires_at = expiresAt;
     }
 
-    return m.request(m.buildPathname(API_V1_SHARE_CREATE, {
-      path: encodePath(path),
-    }), {
+    return m.request(API_V1_SHARE_LIST, {
       method: "POST",
       body,
     });

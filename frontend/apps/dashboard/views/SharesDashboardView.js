@@ -1,8 +1,9 @@
 import m from "mithril";
+import { FsNodeList } from "@polyfile/core/services/FsNodeList";
 import { DashboardShell } from "../components/DashboardShell";
 import { ShareList } from "../services/ShareList";
 import { showPermanentDeleteShareModal } from "../modals/permanent_delete_share_modal";
-import { FILES_DASHBOARD_URL } from "../constants/endpoints";
+import { API_V1_FSNODE_BY_ID, FILES_DASHBOARD_URL } from "../constants/endpoints";
 import { showModal } from "../bootstrap/modal";
 import { ShareDirectoryModal } from "../modals/share_directory_modal";
 import Button from "@polyfile/core/ui-kit/button";
@@ -27,7 +28,6 @@ const formatDate = (value) => {
 
 const getNodeName = (share) => share?.root_fs_node?.name || "—";
 const getNodeType = (share) => share?.root_fs_node?.type || "—";
-const getNodePath = (share) => share?.root_fs_node?.path || null;
 
 const SharesDashboardView = {
   oninit(vnode) {
@@ -53,16 +53,28 @@ const SharesDashboardView = {
     return trimmed.slice(0, index);
   },
 
-  navigateToNode(share) {
-    const path = getNodePath(share);
-    if (!path) {
+  /**
+   * The share list API intentionally omits node paths; resolve the path lazily
+   * from the by-id endpoint (which returns the ancestor chain) on navigation.
+   */
+  async navigateToNode(share) {
+    const nodeId = share?.root_fs_node?.id;
+    if (!nodeId) {
       return;
     }
+
+    const list = new FsNodeList();
+    await list.load(m.buildPathname(API_V1_FSNODE_BY_ID, { id: nodeId }), {});
+    // A deleted or otherwise unreachable node cannot be navigated to.
+    if (list.has_error || list.current === null) {
+      return;
+    }
+
     if (getNodeType(share) === "directory") {
-      m.route.set(FILES_DASHBOARD_URL, { path });
+      m.route.set(FILES_DASHBOARD_URL, { path: list.path });
       return;
     }
-    m.route.set(FILES_DASHBOARD_URL, { path: this.getParentPath(path) });
+    m.route.set(FILES_DASHBOARD_URL, { path: this.getParentPath(list.path) });
   },
 
   revokeShare(vnode, share) {
@@ -93,11 +105,9 @@ const SharesDashboardView = {
   },
 
   openShareModal(vnode, share) {
-    const nodePath = getNodePath(share);
-
     showModal(ShareDirectoryModal, {
       share,
-      path: nodePath,
+      nodeId: share?.root_fs_node?.id || null,
       type: getNodeType(share),
       onUpdate: (data) => {
         Object.assign(share, {

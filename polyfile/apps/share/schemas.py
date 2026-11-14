@@ -7,6 +7,7 @@ from polyfile.apps.share.services import get_share_status
 from polyfile.apps.share.utils import get_public_share_url, share_download_url
 from polyfile.apps.storage.models import FsNode
 from polyfile.apps.storage.schemas import (
+    FsNodeAncestorSchema,
     FsNodeCurrentSchema,
     FsNodeItemSchema,
 )
@@ -37,6 +38,7 @@ class ShareFsNodeCurrentSchema(ShareFsNodeItemSchema, FsNodeCurrentSchema):
 class ShareFsNodeListResponseSchema(Schema):
     """FsNode list response in SharedNode schema."""
     current = fields.Nested(ShareFsNodeCurrentSchema())
+    ancestors = fields.Nested(FsNodeAncestorSchema(), many=True, dump_only=True)
     children = fields.Nested(ShareFsNodeItemSchema(), many=True)
 
 
@@ -45,12 +47,6 @@ class ShareListItemRootFsNodeSchema(Schema):
     id = fields.UUID(dump_only=True)
     name = fields.Str(dump_only=True)
     type = fields.Str(dump_only=True)
-    path = fields.Method("get_path", dump_only=True, allow_none=True)
-
-    @staticmethod
-    def get_path(obj: FsNode) -> str | None:
-        """Return the annotated full path without asserting it is available."""
-        return getattr(obj, "_path", None)
 
 
 class ShareListItemSchema(Schema):
@@ -85,3 +81,9 @@ class ShareListResponseSchema(Schema):
     page_size = fields.Int(dump_only=True)
     total = fields.Int(dump_only=True)
     has_next = fields.Bool(dump_only=True)
+
+
+class CreateShareRequestSchema(Schema):
+    """Request params to create or update a share by node UUID."""
+    node_id = fields.UUID(required=True)
+    expires_at = fields.DateTime(required=False, allow_none=True)

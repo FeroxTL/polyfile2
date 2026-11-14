@@ -13,10 +13,10 @@ from django.http import (
 )
 from django.shortcuts import render
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
 
 from polyfile.apps.share.models import SharedNode, ShareDownload
 from polyfile.apps.share.schemas import (
+    CreateShareRequestSchema,
     SharedNodeTokenContext,
     ShareFsNodeListResponseSchema,
     ShareListItemSchema,
@@ -36,7 +36,6 @@ from polyfile.apps.share.utils import (
 )
 from polyfile.apps.storage import archive_delivery
 from polyfile.apps.storage.archive import create_archive_job
-from polyfile.apps.storage.managers import get_user_fs_node_by_path
 from polyfile.apps.storage.models import FsNode, FsNodeArchiveJob
 from polyfile.apps.storage.schemas import ensure_absolute_path
 from polyfile.apps.storage.services import serve_file
@@ -44,28 +43,6 @@ from polyfile.apps.storage.utils import get_fs_node_with_children
 from polyfile.core import exceptions
 from polyfile.core.http import vary_on_accept, wants_html
 from polyfile.core.rest.generics import AnonymousApiView, BaseApiView
-
-
-def _parse_expires_at(request: HttpRequest):
-    """Read and validate an optional ISO datetime from query or JSON body."""
-    raw_expires_at = request.GET.get("expires_at")
-    if raw_expires_at is None and request.body:
-        try:
-            body = json.loads(request.body)
-        except json.JSONDecodeError:
-            body = {}
-        if isinstance(body, dict):
-            raw_expires_at = body.get("expires_at")
-
-    if raw_expires_at in (None, ""):
-        return None
-
-    expires_at = parse_datetime(str(raw_expires_at))
-    if expires_at is None:
-        raise marshmallow.ValidationError("Invalid datetime.", "expires_at")
-    if timezone.is_naive(expires_at):
-        expires_at = timezone.make_aware(expires_at)
-    return expires_at
 
 
 def _positive_int_param(request: HttpRequest, name: str, default: int) -> int:
@@ -360,44 +337,6 @@ def share_archive_file_view(
         ))
 
 
-class CreateShareView(BaseApiView):
-    """
-    API view to create or update a public share.
-
-    Allows a logged-in user to share a directory or file with others by 
-    generating a public share entry in the system.
-    """
-    response_serializer = ShareListItemSchema()
-
-    def post(self, request: http.HttpRequest, path: str = "") -> http.HttpResponse:
-        """Create or update share."""
-        node_path: PurePosixPath = ensure_absolute_path(path)
-        try:
-            fs_node = get_user_fs_node_by_path(user=request.user, path=node_path)
-        except FsNode.DoesNotExist:
-            fs_node = None
-
-        if fs_node is None:
-            raise marshmallow.ValidationError("FsNode not found.", "path")
-
-        expires_at = _parse_expires_at(request)
-        share = create_public_share(
-            user=request.user,
-            fs_node=fs_node,
-            expires_at=expires_at,
-        )
-
-        with ShareListRequestContext(request):
-            data = self.response_serializer.dump(share)
-
-        #             "id": str(share.token),
-        #             "url": get_public_share_url(request, share.token),
-        #             "expires_at": share.expires_at,
-        #             "revoked_at": share.revoked_at,
-
-        return JsonResponse(data=data)
-
-
 class RevokeShareView(BaseApiView):
     """
     API view to revoke a public share.
@@ -465,5 +404,37 @@ class ListSharesApiView(BaseApiView):
                 "total": total,
                 "has_next": page * SHARE_LIST_PAGE_SIZE < total,
             })
+
+        return http.JsonResponse(data=data)
+
+    def post(self, request: http.HttpRequest) -> http.HttpResponse:
+        """Create or update a share by node UUID."""
+        try:
+            body = json.loads(request.body)
+        except json.JSONDecodeError:
+            raise exceptions.BadRequest("Invalid JSON body")
+
+        try:
+            params = CreateShareRequestSchema().load(body)
+        except marshmallow.ValidationError as e:
+            raise exceptions.FieldValidationError(detail=e.messages)
+
+        try:
+            fs_node = FsNode.active.get(id=params["node_id"], owner=request.user)
+        except FsNode.DoesNotExist:
+            raise exceptions.NotFound(f'FsNode "{params["node_id"]}" not found.')
+
+        expires_at = params.get("expires_at")
+        if expires_at is not None and timezone.is_naive(expires_at):
+            expires_at = timezone.make_aware(expires_at)
+
+        share = create_public_share(
+            user=request.user,
+            fs_node=fs_node,
+            expires_at=expires_at,
+        )
+
+        with ShareListRequestContext(request):
+            data = ShareListItemSchema().dump(share)
 
         return http.JsonResponse(data=data)

@@ -1,3 +1,4 @@
+import json
 import tempfile
 import uuid
 from datetime import timedelta
@@ -74,9 +75,12 @@ class ShareCreationTests(ShareBaseTest):
         super().setUp()
         self.other_user = UserFactory(username="other_user")
 
-    @staticmethod
-    def _create_url(path: str = "/root_dir") -> str:
-        return reverse("share-create", kwargs={"path": path})
+    def _create_by_id(self, node_id) -> object:
+        return self.client.post(
+            reverse("share-list"),
+            data=json.dumps({"node_id": str(node_id)}),
+            content_type="application/json",
+        )
 
     def test_create_share_success(self) -> None:
         """Verify that user_a can create a share for root_dir."""
@@ -85,48 +89,6 @@ class ShareCreationTests(ShareBaseTest):
         self.assertIsInstance(share, SharedNode)
         self.assertEqual(share.owner, self.owner)
         self.assertEqual(share.root_fs_node, self.root_dir)
-
-    def test_create_share_unauthorized(self) -> None:
-        """Verify that other_user cannot create a share for root_dir."""
-        self.client.force_login(self.other_user)
-        response = self.client.post(self._create_url())
-        self.assertEqual(response.status_code, 400)
-        self.assertDictEqual(
-            response.json(),
-            {
-                "error_id": "FieldValidationError",
-                "description": "Error validating fields.",
-                "detail": {"path": ["FsNode not found."]},
-            },
-        )
-
-    def test_create_share_not_found(self) -> None:
-        """Verify that sharing a non-existent path returns a validation error."""
-        self.client.force_login(self.owner)
-        response = self.client.post(self._create_url("/does-not-exist"))
-        self.assertEqual(response.status_code, 400)
-        self.assertDictEqual(
-            response.json(),
-            {
-                "error_id": "FieldValidationError",
-                "description": "Error validating fields.",
-                "detail": {"path": ["FsNode not found."]},
-            },
-        )
-
-    def test_create_share_for_root_is_rejected(self) -> None:
-        """The user root is not a real FsNode and can not be shared."""
-        self.client.force_login(self.owner)
-        response = self.client.post(self._create_url("/"))
-        self.assertEqual(response.status_code, 400)
-        self.assertDictEqual(
-            response.json(),
-            {
-                "error_id": "FieldValidationError",
-                "description": "Error validating fields.",
-                "detail": {"path": ["FsNode not found."]},
-            },
-        )
 
     def test_reactivate_revoked_share(self) -> None:
         """Test that sharing again reactivates and resets the existing share."""
@@ -140,7 +102,7 @@ class ShareCreationTests(ShareBaseTest):
         share.save()
 
         # Create share again for same node
-        response = self.client.post(self._create_url())
+        response = self._create_by_id(self.root_dir.pk)
         self.assertEqual(response.status_code, 200)
         share.refresh_from_db()
         self.assertNotEqual(share.token, old_token)
@@ -156,7 +118,6 @@ class ShareCreationTests(ShareBaseTest):
                     "id": str(share.root_fs_node.id),
                     "name": "root_dir",
                     "type": "directory",
-                    "path": None,
                 },
                 "created_at": share.created_at.isoformat(),
             }, response.json()
@@ -172,8 +133,8 @@ class ShareCreationTests(ShareBaseTest):
         """Repeated create requests for an active share return the same link."""
         self.client.force_login(self.owner)
 
-        first = self.client.post(self._create_url())
-        second = self.client.post(self._create_url())
+        first = self._create_by_id(self.root_dir.pk)
+        second = self._create_by_id(self.root_dir.pk)
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
@@ -183,7 +144,7 @@ class ShareCreationTests(ShareBaseTest):
     def test_create_share_view(self) -> None:
         """Test create share."""
         self.client.force_login(self.owner)
-        response = self.client.post(self._create_url())
+        response = self._create_by_id(self.root_dir.pk)
 
         self.assertEqual(response.status_code, 200)
         share = SharedNode.objects.get(root_fs_node=self.root_dir)
@@ -199,12 +160,82 @@ class ShareCreationTests(ShareBaseTest):
                     "id": str(share.root_fs_node.id),
                     "name": "root_dir",
                     "type": "directory",
-                    "path": "/root_dir",
                 },
                 "created_at": share.created_at.isoformat(),
             },
         )
         self.assertIn(f"/s/{share.token}/", response.json()["url"])
+
+
+class ShareCreateByIdTests(ShareBaseTest):
+    """`POST /api/shares/` with `{node_id}` — the UUID-identity share creation."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.other_user = UserFactory(username="share_by_id_other")
+        self.client.force_login(self.owner)
+
+    def _create(self, body: dict, **kwargs) -> object:
+        return self.client.post(
+            reverse("share-list"),
+            data=json.dumps(body),
+            content_type="application/json",
+            **kwargs,
+        )
+
+    def test_create_share_by_node_id(self) -> None:
+        response = self._create({"node_id": str(self.root_dir.pk)})
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        share = SharedNode.objects.get(root_fs_node=self.root_dir)
+        self.assertEqual(data["id"], str(share.token))
+        self.assertEqual(data["status"], "active")
+        self.assertIn(f"/s/{share.token}/", data["url"])
+
+    def test_create_share_is_idempotent(self) -> None:
+        first = self._create({"node_id": str(self.root_dir.pk)})
+        second = self._create({"node_id": str(self.root_dir.pk)})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json()["id"], second.json()["id"])
+        self.assertEqual(SharedNode.objects.count(), 1)
+
+    def test_create_share_with_expiration(self) -> None:
+        response = self._create({
+            "node_id": str(self.root_dir.pk),
+            "expires_at": "2030-01-01T00:00:00",
+        })
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertIsNotNone(response.json()["expires_at"])
+
+    def test_create_share_for_foreign_node_is_not_found(self) -> None:
+        foreign = FsNodeDirectoryFactory(
+            name="foreign", owner=self.other_user, storage=self.storage,
+        )
+        response = self._create({"node_id": str(foreign.pk)})
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(SharedNode.objects.filter(root_fs_node=foreign).exists())
+
+    def test_create_share_for_tombstoned_node_is_not_found(self) -> None:
+        self.root_dir.deleted_at = now()
+        self.root_dir.save(update_fields=["deleted_at"])
+        self.assertEqual(self._create({"node_id": str(self.root_dir.pk)}).status_code, 404)
+
+    def test_create_share_with_unknown_node_is_not_found(self) -> None:
+        self.assertEqual(self._create({"node_id": str(uuid.uuid4())}).status_code, 404)
+
+    def test_create_share_with_invalid_body_is_rejected(self) -> None:
+        self.assertEqual(self._create({}).status_code, 400)
+        self.assertEqual(self._create({"node_id": "not-a-uuid"}).status_code, 400)
+
+    def test_create_share_with_invalid_json_is_rejected(self) -> None:
+        response = self.client.post(
+            reverse("share-list"),
+            data="{invalid",
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error_id"], "BadRequest")
 
 
 class ShareRevocationTests(ShareBaseTest):
@@ -273,10 +304,11 @@ class ShareRevocationTests(ShareBaseTest):
         old_token = self.share.token
         self.assertEqual(self.client.post(self._revoke_url(old_token)).status_code, 204)
 
-        response = self.client.post(reverse(
-            "share-create",
-            kwargs={"path": f"/{self.root_dir.name}"},
-        ))
+        response = self.client.post(
+            reverse("share-list"),
+            data=json.dumps({"node_id": str(self.root_dir.pk)}),
+            content_type="application/json",
+        )
 
         self.share.refresh_from_db()
         self.assertEqual(response.status_code, 200)
@@ -418,6 +450,8 @@ class ShareDetailApiTests(ShareBaseTest):
             response.json(),
             {
                 "current": {
+                    "id": str(self.root_dir.pk),
+                    "parent_id": None,
                     "name": self.root_dir.name,
                     "type": FsNode.TypeChoices.DIRECTORY.value,
                     "created_at": self.root_dir.created_at.isoformat(),
@@ -427,10 +461,12 @@ class ShareDetailApiTests(ShareBaseTest):
                     "md5": "",
                     "file": "",
                     "download_url": mock.ANY,
-                    "path": "/",
                 },
+                "ancestors": [],
                 "children": [
                     {
+                        "id": str(self.child_dir.pk),
+                        "parent_id": str(self.root_dir.pk),
                         "created_at": self.child_dir.created_at.isoformat(),
                         "download_url": "",
                         "file": "",
@@ -442,6 +478,8 @@ class ShareDetailApiTests(ShareBaseTest):
                         "type": FsNode.TypeChoices.DIRECTORY.value,
                     },
                     {
+                        "id": str(self.child_file.pk),
+                        "parent_id": str(self.root_dir.pk),
                         "created_at": self.child_file.created_at.isoformat(),
                         "download_url": mock.ANY,
                         "file": "notes.txt",
@@ -502,6 +540,8 @@ class ShareDetailApiTests(ShareBaseTest):
             response.json(),
             {
                 "current": {
+                    "id": str(self.child_dir.pk),
+                    "parent_id": str(self.root_dir.pk),
                     "name": self.child_dir.name,
                     "type": FsNode.TypeChoices.DIRECTORY.value,
                     "created_at": self.child_dir.created_at.isoformat(),
@@ -511,10 +551,14 @@ class ShareDetailApiTests(ShareBaseTest):
                     "md5": "",
                     "file": "",
                     "download_url": "",
-                    "path": f"/{self.child_dir.name}",
                 },
+                "ancestors": [
+                    {"id": str(self.root_dir.pk), "name": self.root_dir.name},
+                ],
                 "children": [
                     {
+                        "id": str(nested_node.pk),
+                        "parent_id": str(self.child_dir.pk),
                         "created_at": nested_node.created_at.isoformat(),
                         "download_url": mock.ANY,
                         "file": nested_node.object_key,

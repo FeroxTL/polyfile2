@@ -3,7 +3,7 @@ import tempfile
 import zipfile
 from datetime import timedelta
 from io import BytesIO, StringIO
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from django.core.management import call_command
 from django.http.response import FileResponse
@@ -310,7 +310,7 @@ class ArchiveApiTests(ArchiveApiTestBase):
     def test_deleted_root_invalidates_the_job(self) -> None:
         self.client.force_login(self.user)
         job = create_archive_job(self.user, self.root)
-        remove_fs_node(self.user, PurePosixPath("/root"))
+        remove_fs_node(self.user, self.root.pk)
 
         status_response = self.client.get(
             reverse("archive_job_status", args=[job.pk]),
@@ -339,7 +339,7 @@ class ArchiveApiTests(ArchiveApiTestBase):
 
     def test_other_user_cannot_probe_a_deleted_job(self) -> None:
         job = create_archive_job(self.user, self.root)
-        remove_fs_node(self.user, PurePosixPath("/root"))
+        remove_fs_node(self.user, self.root.pk)
 
         other_user = UserFactory()
         self.client.force_login(other_user)
@@ -417,7 +417,7 @@ class ArchiveApiTests(ArchiveApiTestBase):
     def test_status_error_renders_html_for_browser(self) -> None:
         self.client.force_login(self.user)
         job = create_archive_job(self.user, self.root)
-        remove_fs_node(self.user, PurePosixPath("/root"))
+        remove_fs_node(self.user, self.root.pk)
 
         response = self.client.get(
             reverse("archive_job_status", args=[job.pk]),

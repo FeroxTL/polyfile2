@@ -11,39 +11,46 @@ from polyfile.apps.storage.models import FsNode, FsNodeDeletionJob, TempUpload
 from polyfile.apps.storage.utils import (
     create_fs_node,
     get_fs_node_with_children,
+    get_fs_node_with_children_by_id,
     remove_fs_node,
 )
 from polyfile.core import exceptions
 from polyfile.core.api import BaseApiView
+from polyfile.core.rest.generics import CreateApiView
 
 
 class FsNodeListApiView(BaseApiView):
     @staticmethod
-    def get(request: RequestType) -> http.HttpResponse:
-        """Retrieve FsNode (file/directory) by path and its children (if any)."""
+    def get(request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:
+        """Retrieve FsNode (file/directory) by UUID or path and its children (if any)."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
-        try:
-            params = schemas.FsNodeListRequestSchema().load(request.GET)
-        except marshmallow.ValidationError as e:
-            raise exceptions.FieldValidationError(detail=e.messages)
+        if node_id is not None:
+            fs_node_with_children = get_fs_node_with_children_by_id(
+                user=request.user,
+                node_id=node_id,
+            )
+        else:
+            try:
+                params = schemas.FsNodeListRequestSchema().load(request.GET)
+            except marshmallow.ValidationError as e:
+                raise exceptions.FieldValidationError(detail=e.messages)
 
-        fs_node_with_children = get_fs_node_with_children(user=request.user, path=params['path'])
+            fs_node_with_children = get_fs_node_with_children(user=request.user, path=params['path'])
+
         with schemas.ShareUrlRequestContext(request):
             data = schemas.FsNodeListResponseSchema().dump(fs_node_with_children)
         return http.JsonResponse(data=data)
 
     @staticmethod
-    def delete(request: RequestType) -> http.HttpResponse:
-        """Remove FsNode."""
+    def delete(request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:
+        """Remove FsNode by its UUID."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
-        try:
-            params = schemas.FsNodeRemoveRequestSchema().load(request.GET)
-        except marshmallow.ValidationError as e:
-            raise exceptions.FieldValidationError(detail=e.messages)
+        if node_id is None:
+            raise exceptions.BadRequest("node_id is required")
 
-        job = remove_fs_node(user=request.user, path=params['path'])
+        job = remove_fs_node(user=request.user, node_id=node_id)
         return http.JsonResponse(
             data={"job_id": str(job.pk), "status": job.status},
             status=202,
@@ -71,46 +78,52 @@ class FsNodeDeletionJobStatusApiView(BaseApiView):
         )
 
 
-class FsNodeMkdirApiView(BaseApiView):
-    @staticmethod
-    def post(request: RequestType) -> http.HttpResponse:
-        """Create FsNode(type=directory)."""
+class FsNodeCreateApiView(CreateApiView):
+    """Base view for FsNode creation endpoints (directory or file)."""
+
+    serializer_class = schemas.FsNodeCreateByNameRequestSchema
+    fs_node_type: FsNode.TypeChoices
+
+    @classmethod
+    def create_node(cls, request: RequestType) -> FsNode:
+        """Create an FsNode of ``fs_node_type`` from the JSON body params."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
         if request.user.storage_id is None:
             raise exceptions.InvalidUserStorageError(
-                detail='Your storage is not configured. Contact your administrator',
+                detail="Your storage is not configured. Contact your administrator",
             )
 
-        params = schemas.FsNodeCreateRequestSchema().load(request.GET)
-        fs_node = create_fs_node(
+        params = cls.load_params(request)
+        return create_fs_node(
             user=request.user,
-            path=params['path'],
-            fs_node_type=FsNode.TypeChoices.DIRECTORY,
+            parent_id=params["parent_id"],
+            name=params["name"],
+            fs_node_type=cls.fs_node_type,
         )
-        return http.JsonResponse(data=schemas.FsNodeItemSchema().dump(fs_node))
+
+    @classmethod
+    def create(cls, request: RequestType) -> dict:
+        """Create an FsNode and return its serialized item."""
+        return schemas.FsNodeItemSchema().dump(cls.create_node(request))
 
 
-class FsNodeTouchApiView(BaseApiView):
-    @staticmethod
-    def post(request: RequestType) -> http.HttpResponse:
-        """Create FsNode(type=file)."""
-        assert request.user.is_authenticated and isinstance(request.user, User)
+class FsNodeMkdirApiView(FsNodeCreateApiView):
+    """Create FsNode(type=directory)."""
+    fs_node_type = FsNode.TypeChoices.DIRECTORY
 
-        if request.user.storage_id is None:
-            raise exceptions.InvalidUserStorageError(
-                detail='Your storage is not configured. Contact your administrator',
-            )
 
-        params = schemas.FsNodeCreateRequestSchema().load(request.GET)
-        fs_node = create_fs_node(
-            user=request.user,
-            path=params['path'],
-            fs_node_type=FsNode.TypeChoices.FILE,
-        )
+class FsNodeTouchApiView(FsNodeCreateApiView):
+    """Create FsNode(type=file)."""
+    fs_node_type = FsNode.TypeChoices.FILE
+
+    @classmethod
+    def post(cls, request: RequestType) -> http.HttpResponse:
+        """Create FsNode(type=file) and its TempUpload session."""
+        fs_node = cls.create_node(request)
         temp_upload = TempUpload.objects.create(fs_node=fs_node)
 
-        return http.JsonResponse({
+        return cls.json_response({
             **schemas.FsNodeItemSchema().dump(fs_node),
-            'upload_url': reverse('upload_file', kwargs={'token': temp_upload.token})
+            "upload_url": reverse("upload_file", kwargs={"token": temp_upload.token}),
         })

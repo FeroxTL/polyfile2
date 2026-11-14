@@ -1,5 +1,5 @@
 import m from "mithril";
-import CreateDirectoryModal from "./modals/create_directory_modal";
+import { CreateDirectoryModal } from "./modals/create_directory_modal";
 import { NavLink } from "./bootstrap/navlink";
 import Collapse from "./bootstrap/collapse";
 import {showModal} from "./bootstrap/modal";

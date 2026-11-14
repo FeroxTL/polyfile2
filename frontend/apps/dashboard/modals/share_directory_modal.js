@@ -85,10 +85,10 @@ const ShareDirectoryModal = {
     vnode.state.error = null;
     vnode.state.revoked = false;
 
-    const { path, onUpdate } = vnode.attrs;
+    const { nodeId, onUpdate } = vnode.attrs;
     const expiresAt = toExpiresAt(vnode.state.formExpiresAt);
 
-    ShareService.create(path, expiresAt)
+    ShareService.create(nodeId, expiresAt)
       .then((data) => {
         vnode.state.share = data && new SharedNode(data);
         vnode.state.shareLink = vnode.state.share?.url || "";

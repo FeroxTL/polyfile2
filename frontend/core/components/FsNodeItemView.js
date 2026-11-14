@@ -15,7 +15,7 @@ const FsNodeItemView = {
         items: fsnodeList.elements.filter(item => item.type === "file") 
       });
     } else if (navigationHandler) {
-      navigationHandler(fsnodeList.current.path, fsNode.name);
+      navigationHandler(fsnodeList.path, fsNode.name, fsNode);
     }
     event.preventDefault();
     return false;

@@ -2,9 +2,8 @@ import {
   Modal,
   closeModal,
 } from "../bootstrap/modal";
-import { API_V1_FSNODE } from "../constants/endpoints";
+import { API_V1_FSNODE_BY_ID } from "../constants/endpoints";
 import Button from "@polyfile/core/ui-kit/button";
-import {joinPath} from "@polyfile/core/utils/urls";
 import {DashboardFsNodeList} from "../services/DashboardFsNodeList";
 import m from "mithril";
 
@@ -28,27 +27,27 @@ const sendRequest = (vnode) => {
     return Promise.resolve();
   }
 
-  const paths = vnode.state.removeList.map((item) =>
-    joinPath(DashboardFsNodeList.current.path, item.name),
-  );
-
-  // For MVP delete sequentially; all return 202 Accepted
-  const requests = paths.map((path) =>
-    m.request(API_V1_FSNODE, {
+  // Delete by UUID; all return 202 Accepted
+  const requests = vnode.state.removeList.map((item) =>
+    m.request(m.buildPathname(API_V1_FSNODE_BY_ID, { id: item.id }), {
       method: "DELETE",
-      params: { path },
     }),
   );
 
   return Promise.allSettled(requests).then((results) => {
+    const rejected = results.find((result) => result.status === "rejected");
+    if (rejected) {
+      // Keep the modal open and surface the first failure.
+      vnode.state.error = rejected.reason;
+      return;
+    }
+
     closeModal(vnode.attrs.modalId);
-    // Optimistically remove all requested items
+    // Remove only the successfully deleted items
     const toRemove = new Set(vnode.state.removeList);
     DashboardFsNodeList.elements = DashboardFsNodeList.elements.filter(
       (item) => !toRemove.has(item),
     );
-  }, (error) => {
-    vnode.state.error = error;
   });
 }
 
@@ -65,7 +64,10 @@ const RemoveFsNodeModalComponent = {
           m(".modal-content", [
             m(Modal.modalHeader, {title: "Remove?", ...vnode.attrs}),
             m("form.has-validation", {
-              onsubmit: (e) => {e.preventDefault(); sendRequest(vnode)},
+              onsubmit: (e) => {
+                e.preventDefault();
+                return sendRequest(vnode);
+              },
             }, [
               m(".modal-body", [
                 vnode.state.error && m(".alert alert-danger", getDetailFromError(vnode.state.error)),
@@ -83,4 +85,4 @@ const RemoveFsNodeModalComponent = {
   }
 };
 
-export default RemoveFsNodeModalComponent;
+export { RemoveFsNodeModalComponent, sendRequest as sendRemoveFsNodesRequest };

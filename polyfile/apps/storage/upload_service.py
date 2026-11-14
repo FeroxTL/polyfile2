@@ -21,11 +21,21 @@ CHUNK_SIZE = 64 * 1024
 
 
 def _build_object_key(fs_node: FsNode) -> str:
-    """Build a safe object key from the node name and storage upload_to path."""
+    """Build a safe, collision-free object key for the node's physical object.
+
+    The key embeds the FsNode UUID (the node is always created before the
+    upload starts) so that:
+    - files with the same name uploaded on the same day never collide, even
+      in different directories;
+    - deleting a file and re-uploading it creates a new physical object, so a
+      pending deletion of the old object can never remove the new one (the
+      deletion worker deletes by object key);
+    - renaming the node keeps the key valid, because the UUID never changes.
+    """
     backend = fs_storages[fs_node.storage_id]
     upload_to = getattr(backend, "upload_to", "")
     dirname = datetime.now().strftime(upload_to) if upload_to else ""
-    filename = PurePosixPath(dirname) / fs_node.name
+    filename = PurePosixPath(dirname) / f"{fs_node.pk}-{fs_node.name}"
     return str(validate_file_name(str(filename), allow_relative_path=True))
 
 

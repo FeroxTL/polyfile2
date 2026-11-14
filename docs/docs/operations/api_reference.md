@@ -2,25 +2,27 @@
 
 ## Overview
 
-The main file management APIs live in `polyfile/apps/storage/api.py`. The API is path-based and requires authentication. All file operations go through the storage/tree logic and respect [security constraints](../system_core/security.md).
+The main file management APIs live in `polyfile/apps/storage/api.py`. Read operations are path- or UUID-based; all mutations (create, delete, share) address nodes by their UUID (`FsNode.id`). All file operations go through the storage/tree logic and respect [security constraints](../system_core/security.md).
 
 ## Storage API
 
 Base paths are wired in `polyfile/core/urls.py` and `polyfile/apps/storage/urls.py`. Most endpoints are under `/api/v1/fs-node/`.
 
 ### List/get nodes
-`GET /api/v1/fs-node/`
+`GET /api/v1/fs-node/` or `GET /api/v1/fs-node/<uuid:node_id>/`
 
-**Query params:**
-- `path` (required) - Logical path to the node
+**Query params (path-based form only):**
+- `path` (optional, defaults to `/`) - Logical path to the node
 
 **Behavior:**
-Returns a recursive tree structure via [FsNode](../system_core/models_data_model.md) resolution using CTE-based path computation. The response includes the current node and its children.
+Returns the current node, its ancestors (breadcrumb chain, root first) and its children. UUID lookups are owner-scoped: a foreign, deleted or unknown UUID returns 404. For the virtual root (`path=/` or no `node_id`), `current.id` is `null` and `ancestors` is empty.
 
 **Response format:**
 ```json
 {
   "current": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "parent_id": "6a2e8400-e29b-41d4-a716-446655440001",
     "name": "example.txt",
     "type": "file",
     "created_at": "2026-01-01T00:00:00Z",
@@ -29,21 +31,18 @@ Returns a recursive tree structure via [FsNode](../system_core/models_data_model
     "mime_type": "text/plain",
     "md5": "d41d8cd98f00b204e9800998ecf8427e",
     "file": "user/123/example.txt",
-    "download_url": "/download/00000000-0000-0000-0000-000000000000/",
+    "download_url": "/download/550e8400-e29b-41d4-a716-446655440000/",
     "path": "/folder/example.txt"
   },
+  "ancestors": [
+    {"id": "6a2e8400-e29b-41d4-a716-446655440001", "name": "folder"}
+  ],
   "children": [
     {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "parent_id": "550e8400-e29b-41d4-a716-446655440000",
       "name": "subfolder",
-      "type": "directory",
-      "created_at": "2026-01-01T00:00:00Z",
-      "modified_at": "2026-01-01T00:00:00Z",
-      "size": 0,
-      "mime_type": null,
-      "md5": null,
-      "file": null,
-      "download_url": "/download/11111111-1111-1111-1111-111111111111/",
-      "path": "/folder/subfolder"
+      "type": "directory"
     }
   ]
 }
@@ -52,18 +51,20 @@ Returns a recursive tree structure via [FsNode](../system_core/models_data_model
 ### Create directory
 `POST /api/v1/fs-node/mkdir`
 
-**Query params:**
-- `path` (required) - Path for the new directory
+**JSON body:**
+- `name` (required) - Directory name (reserved characters `< > : " / \ | ? *` are rejected)
+- `parent_id` (optional, default `null`) - UUID of the parent directory; `null` creates in the virtual root
 
 **Requirements:** User must have `storage_id` configured.
 
-**Behavior:** Creates a directory [FsNode](../system_core/models_data_model.md#fsnode) in the tree.
+**Behavior:** Creates a directory [FsNode](../system_core/models_data_model.md#fsnode) in the tree. A foreign or missing `parent_id` returns 404; a file parent returns 409; a duplicate name returns 409.
 
 ### Initiate file upload
 `POST /api/v1/fs-node/touch`
 
-**Query params:**
-- `path` (required) - Path for the new file
+**JSON body:**
+- `name` (required) - File name
+- `parent_id` (optional, default `null`) - UUID of the parent directory
 
 **Requirements:** User must have `storage_id` configured.
 
@@ -72,7 +73,9 @@ Returns a recursive tree structure via [FsNode](../system_core/models_data_model
 **Response (example):**
 ```json
 {
-  "...node_data...",
+  "id": "11111111-1111-1111-1111-111111111111",
+  "parent_id": "6a2e8400-e29b-41d4-a716-446655440001",
+  "name": "report.pdf",
   "upload_url": "/upload/<token>/"
 }
 ```
@@ -80,12 +83,9 @@ Returns a recursive tree structure via [FsNode](../system_core/models_data_model
 See [Storage backends](../system_core/storage_backends.md#upload-flow) for upload details.
 
 ### Delete node
-`DELETE /api/v1/fs-node/`
+`DELETE /api/v1/fs-node/<uuid:node_id>/`
 
-**Query params:**
-- `path` (required) - Path to delete
-
-**Behavior:** Marks nodes for deletion and creates a [FsNodeDeletionJob](../system_core/models_data_model.md#fsnodedeletionjob). Returns `202 Accepted` immediately (asynchronous deletion).
+**Behavior:** Marks the node's subtree for deletion and creates a [FsNodeDeletionJob](../system_core/models_data_model.md#fsnodedeletionjob). Returns `202 Accepted` immediately (asynchronous deletion). Foreign, deleted or unknown UUIDs return 404.
 
 **Response:**
 ```json
@@ -115,6 +115,16 @@ Details in [Recursive deletion/background jobs](../system_core/recursive_deletio
 }
 ```
 
+## Share API
+
+- `POST /api/shares/` with JSON body `{"node_id": "<uuid>", "expires_at": "<iso datetime>|null"}` - create or reactivate a public share for the node (owner-scoped; foreign or unknown nodes return 404).
+- `GET /api/shares/` - list the current user's shares (`status`, `page` query params).
+- `POST /api/shares/<uuid:share_token>/revoke` - revoke a share (soft delete).
+- `DELETE /api/shares/<uuid:share_token>/delete` - permanently delete a share.
+- `GET /api/shares/detail/<uuid:share_token>/<path>/` - public read inside a share; `ancestors` never climb above the share root and the share root's `parent_id` is hidden.
+
+See [Sharing & signed tokens](../system_core/sharing_signed_tokens.md) for the full model.
+
 ## Upload & download
 
 - **Upload**: `POST /upload/<token>/` - Upload raw file content using token from [TempUpload](../system_core/models_data_model.md#tempupload) (handled by storage views)
@@ -140,11 +150,11 @@ instead of opening the JSON error response as a new page.
 ## Other endpoints
 - `GET /api/dashboard-context/` - Dashboard context
 - `POST /api/v1/user/logout/` - Logout ([Authentication & accounts](../system_core/authentication_accounts.md))
-- Share endpoints from `apps.share.urls` ([Sharing & signed tokens](../system_core/sharing_signed_tokens.md))
 
 ## Error handling
 Uses custom exceptions from `polyfile.core.exceptions`:
 - `FieldValidationError` for validation failures
+- `BadRequest` for malformed JSON bodies
 - `NotFound` for missing resources
 - `InvalidUserStorageError` when user has no storage configured
 

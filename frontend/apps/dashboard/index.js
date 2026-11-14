@@ -1,8 +1,28 @@
-import {FILES_DASHBOARD_URL, DEFAULT_ROOT_URL, SHARES_DASHBOARD_URL, API_V1_FSNODE} from "./constants/endpoints";
+import {FILES_DASHBOARD_URL, DEFAULT_ROOT_URL, SHARES_DASHBOARD_URL} from "./constants/endpoints";
 import { DashboardView } from "./dashboard";
+import { loadDashboardRoute } from "./route";
 import { SharesDashboardView } from "./views/SharesDashboardView";
 import m from "mithril";
-import {DashboardFsNodeList} from "./services/DashboardFsNodeList";
+
+/**
+ * Read the initial FsNode embedded by the server for this document load.
+ *
+ * @returns {{path: string, node_id: string|null}|null} Node data or null.
+ */
+const readInitialFsNode = () => {
+  const element = document.getElementById("initial-fs-node");
+  if (!element) {
+    return null;
+  }
+  try {
+    return JSON.parse(element.textContent);
+  } catch {
+    return null;
+  }
+};
+
+// The server renders the initial node once; use it only for the first match.
+let initialFsNode = readInitialFsNode();
 
 // This behavior is supported by backend
 m.route.prefix = "";
@@ -10,7 +30,8 @@ m.route.prefix = "";
 m.route(document.body, DEFAULT_ROOT_URL, {
   [FILES_DASHBOARD_URL]: {
     onmatch: (args) => {
-      DashboardFsNodeList.load(API_V1_FSNODE, { path: args.path });
+      loadDashboardRoute(args.path, initialFsNode);
+      initialFsNode = null;
       return DashboardView;
     }
   },

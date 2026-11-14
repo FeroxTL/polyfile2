@@ -2,7 +2,7 @@
 import m from "mithril";
 import { FILES_DASHBOARD_URL } from "./constants/endpoints";
 import { showModal } from "./bootstrap/modal";
-import RemoveFsNodeModalComponent from "./modals/remove_fsnode_modal";
+import { RemoveFsNodeModalComponent } from "./modals/remove_fsnode_modal";
 import { ShareDirectoryModal } from "./modals/share_directory_modal";
 import { DashboardFsNodeList } from "./services/DashboardFsNodeList";
 import { DashboardFsNodeListView } from "./components/DashboardFsNodeListView";
@@ -11,13 +11,12 @@ import { DashboardShell } from "./components/DashboardShell";
 import { ArchiveDownloadModal } from "@polyfile/core/components/ArchiveDownloadModal";
 import { BreadcrumbsView } from "@polyfile/core/components/BreadcrumbsView";
 import { FolderDownloadButton } from "@polyfile/core/components/FolderDownloadButton";
-import { joinPath } from "@polyfile/core/utils/urls";
+import { joinPath, normalizePath } from "@polyfile/core/utils/urls";
 
 const openShareModal = (fsNode) => {
-  const path = joinPath(DashboardFsNodeList.current.path, fsNode.name);
   showModal(ShareDirectoryModal, {
     share: fsNode.share,
-    path,
+    nodeId: fsNode.id,
     type: fsNode.type,
     onUpdate: (shareData) => {
       fsNode.share = shareData;
@@ -32,11 +31,24 @@ const openArchiveDownloadModal = (fsNode) => {
   });
 };
 
-const DashboardNavigationHandler = (path, name) => {
+/**
+ * Preload a known directory by UUID so the route handler skips the path lookup.
+ */
+const preloadPath = (fsNode, targetPath) => {
+  if (fsNode?.id) {
+    DashboardFsNodeList.loadByNodeId(fsNode.id, normalizePath(targetPath));
+  }
+};
+
+const dashboardNavigationHandler = (path, name, fsNode) => {
+  const targetPath = normalizePath(joinPath(path, name));
+  preloadPath(fsNode, targetPath);
   m.route.set(FILES_DASHBOARD_URL, {
-    path: joinPath(path, name)
+    path: targetPath
   });
 };
+
+const dashboardBreadcrumbHandler = (fsNode, path) => preloadPath(fsNode, path);
 
 const DashboardView = {
   view() {
@@ -56,6 +68,7 @@ const DashboardView = {
           getPublicUrl: (path) => m.buildPathname(FILES_DASHBOARD_URL, {
             path: joinPath("/", path),
           }),
+          onNavigate: dashboardBreadcrumbHandler,
           actions: m(FolderDownloadButton, {
             fsNode: DashboardFsNodeList.current,
             onDownload: openArchiveDownloadModal,
@@ -65,12 +78,12 @@ const DashboardView = {
       m(DashboardFsNodeListView, {
         fsnodeList: DashboardFsNodeList,
         header: m("h4.mb-3", "Files & Directories"),
-        navigationHandler: DashboardNavigationHandler,
+        navigationHandler: dashboardNavigationHandler,
         onShareClick: openShareModal,
       }),
     ]);
   },
 };
 
-// Export the component for use in Mithril's mount function
-export { DashboardView };
+// Export the components for use in tests and Mithril's mount function
+export { DashboardView, dashboardNavigationHandler, dashboardBreadcrumbHandler };

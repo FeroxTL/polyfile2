@@ -34,7 +34,7 @@ const createVnode = (attrs = {}) => {
   return {
     attrs: {
       share: shareData,
-      path: attrs.path || "/docs/file.txt",
+      nodeId: attrs.nodeId || "11111111-1111-1111-1111-111111111111",
       type: attrs.type || "file",
       onCreate: attrs.onCreate || vi.fn(),
       onUpdate: attrs.onUpdate || vi.fn(),
@@ -81,6 +81,7 @@ describe("ShareDirectoryModal.submit()", () => {
     await vi.waitFor(() => {
       expect(vnode.state.loading).toBe(false);
     });
+    expect(mockCreate).toHaveBeenCalledWith(vnode.attrs.nodeId, expiresAt);
     expect(onUpdate).toHaveBeenCalledWith(mockData);
     expect(vnode.state.shareLink).toBe(mockData.url);
     expect(vnode.state.error).toBeNull();

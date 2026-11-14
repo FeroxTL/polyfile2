@@ -5,7 +5,7 @@ import { DashboardFsNodeListView } from "../DashboardFsNodeListView";
 const createListView = () => new DashboardFsNodeListView({
   attrs: {
     fsnodeList: {
-      current: { path: "/" },
+      current: { name: "" },
       elements: [],
       selectFsNode: vi.fn(),
     },

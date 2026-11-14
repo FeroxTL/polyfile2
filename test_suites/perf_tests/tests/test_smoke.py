@@ -8,6 +8,7 @@ from polyfile_perf.client import PolyfileClient
 from polyfile_perf.config import TargetConfig
 from polyfile_perf.smoke import run_smoke_flow
 
+NODE_ID = "11111111-1111-1111-1111-111111111111"
 SHARE_ID = "33333333-3333-3333-3333-333333333333"
 JOB_ID = "44444444-4444-4444-4444-444444444444"
 
@@ -20,9 +21,11 @@ def make_handler(calls: list[tuple[str, str]], *, fail_upload: bool = False) -> 
 
         if path == "/dashboard-context/":
             return httpx.Response(200, json={"sidebar_urls": []})
-        if path == "/api/v1/fs-node/":
+        if path == f"/api/v1/fs-node/{NODE_ID}/":
             if method == "DELETE":
                 return httpx.Response(202, json={"job_id": JOB_ID, "status": "pending"})
+            return httpx.Response(200, json={"current": {}, "children": []})
+        if path == "/api/v1/fs-node/":
             if request.url.params.get("path") == "/":
                 return httpx.Response(200, json={"current": {}, "children": []})
             return httpx.Response(
@@ -33,17 +36,17 @@ def make_handler(calls: list[tuple[str, str]], *, fail_upload: bool = False) -> 
                 },
             )
         if path == "/api/v1/fs-node/mkdir":
-            return httpx.Response(200, json={"name": "perf-smoke", "type": "directory"})
+            return httpx.Response(200, json={"id": NODE_ID, "name": "perf-smoke", "type": "directory"})
         if path == "/api/v1/fs-node/touch":
             return httpx.Response(
                 200,
-                json={"name": "payload.bin", "type": "file", "upload_url": "/upload/token/"},
+                json={"id": NODE_ID, "name": "payload.bin", "type": "file", "upload_url": "/upload/token/"},
             )
         if path == "/upload/token/":
             if fail_upload:
                 return httpx.Response(500, json={"detail": "upload failed"})
             return httpx.Response(200, json={"size": len(request.content)})
-        if path.startswith("/api/shares/create"):
+        if path == "/api/shares/":
             return httpx.Response(200, json={"id": SHARE_ID})
         if path == f"/api/shares/detail/{SHARE_ID}/":
             return httpx.Response(200, json={"current": {"name": "perf-smoke"}, "children": []})
@@ -81,9 +84,9 @@ def test_smoke_flow_completes_and_cleans_up() -> None:
         "delete-directory",
         "wait-deletion",
     ]
-    assert ("DELETE", "/api/v1/fs-node/") in calls
+    assert ("DELETE", f"/api/v1/fs-node/{NODE_ID}/") in calls
     assert ("POST", f"/api/shares/{SHARE_ID}/revoke") in calls
-    assert any(method == "POST" and path.startswith("/api/shares/create/") for method, path in calls)
+    assert ("POST", "/api/shares/") in calls
 
 
 def test_smoke_flow_records_failure_and_still_cleans_up() -> None:
@@ -94,4 +97,4 @@ def test_smoke_flow_records_failure_and_still_cleans_up() -> None:
 
     assert not result.ok
     assert [step.name for step in result.failures] == ["upload"]
-    assert ("DELETE", "/api/v1/fs-node/") in calls
+    assert ("DELETE", f"/api/v1/fs-node/{NODE_ID}/") in calls

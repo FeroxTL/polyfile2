@@ -3,6 +3,8 @@
  */
 export default class FsNode {
   constructor(data) {
+    this.id = data.id || null;
+    this.parent_id = data.parent_id || null;
     this.name = data.name || "";
     this.type = data.type || "";
     this.created_at = data.created_at || null;
@@ -11,7 +13,6 @@ export default class FsNode {
     this.mime_type = data.mime_type || "";
     this.md5 = data.md5 || "";
     this.file = data.file || "";
-    this.path = data.path || "";
     this.download_url = data.download_url || "";
     this.share = data.share || null;
     this.selected = false;

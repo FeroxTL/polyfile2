@@ -2,7 +2,6 @@ from django.urls import path
 from django.views.generic.base import TemplateView
 
 from polyfile.apps.share.views import (
-    CreateShareView,
     GetShareDetailApiView,
     ListSharesApiView,
     PermanentDeleteShareView,
@@ -45,11 +44,6 @@ urlpatterns = [
         "api/shares/",
         ListSharesApiView.as_view(),
         name="share-list",
-    ),
-    path(
-        "api/shares/create<path:path>",
-        CreateShareView.as_view(),
-        name="share-create",
     ),
     path(
         "api/shares/<uuid:share_token>/delete",

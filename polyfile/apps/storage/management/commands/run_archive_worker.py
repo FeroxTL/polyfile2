@@ -34,6 +34,18 @@ class ArchiveCancelled(Exception):
     """Raised internally when a job is cancelled while being built."""
 
 
+class ArchiveSourceMissing(Exception):
+    """Raised when a snapshotted source file vanished before the build.
+
+    The message intentionally references only the path inside the ZIP:
+    absolute server paths must never reach the client.
+    """
+
+    def __init__(self, zip_path: str) -> None:
+        self.zip_path = zip_path
+        super().__init__(f'Archive source file is missing: "{zip_path}"')
+
+
 class ArchiveWorker(BaseCommand):
     """Management command that builds pending directory archives."""
 
@@ -192,6 +204,11 @@ class ArchiveWorker(BaseCommand):
         except ArchiveCancelled:
             self._delete_archive_safely(backend, key)
             self._mark_cancelled(job)
+        except ArchiveSourceMissing as exc:
+            # A snapshotted object disappeared. Retrying cannot fix the
+            # snapshot; the client can request a new one.
+            self._delete_archive_safely(backend, key)
+            self._fail_job(job, exc, retry=False)
         except FileNotFoundError as exc:
             # A snapshotted object disappeared. Retrying cannot fix the
             # snapshot; the client can request a new one.
@@ -227,7 +244,11 @@ class ArchiveWorker(BaseCommand):
                 # Use the manifest snapshot, not item.node.file: the node may
                 # have been re-uploaded or moved to another storage after the
                 # job was requested.
-                with item.file.open("rb") as source, archive.open(
+                try:
+                    source = item.file.open("rb")
+                except FileNotFoundError:
+                    raise ArchiveSourceMissing(item.zip_path) from None
+                with source, archive.open(
                     item.zip_path,
                     "w",
                 ) as target:
@@ -358,13 +379,26 @@ class ArchiveWorker(BaseCommand):
         logger.info("Archive job %s cancelled", job.pk)
         self.stdout.write(self.style.WARNING(f"Archive job {job.pk} cancelled"))
 
+    @staticmethod
+    def _safe_error_message(exc: Exception) -> str:
+        """Return a message safe to expose via the API.
+
+        ``str(OSError)`` embeds the absolute filename, which would leak server
+        paths to the client; ``exc.strerror`` carries the same diagnostic
+        without the path. Full details are still written to the server log by
+        the caller.
+        """
+        if isinstance(exc, OSError) and exc.strerror:
+            return exc.strerror[:4000]
+        return str(exc)[:4000]
+
     def _fail_job(
         self,
         job: FsNodeArchiveJob,
         exc: Exception,
         retry: bool,
     ) -> None:
-        message = str(exc)[:4000]
+        message = self._safe_error_message(exc)
         job.last_error = message
 
         if retry and job.attempts < self.max_attempts:

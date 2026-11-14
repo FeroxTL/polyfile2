@@ -74,7 +74,7 @@ class TempUploadAdmin(admin.ModelAdmin):
 
 @admin.register(FsNodeDeletionJob)
 class FsNodeDeletionJobAdmin(admin.ModelAdmin):
-    list_display = ("id", "root_path", "status", "total_nodes",)
+    list_display = ("id", "root_node_name", "root_node_uuid", "status", "total_nodes",)
     list_filter = ("status",)
 
 

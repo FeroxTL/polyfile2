@@ -5,14 +5,20 @@ import {joinPath} from "../utils/urls";
 const FsNodeBcLink = {
   view(vnode) {
     const
-      {name, index, array, getPublicUrl} = vnode.attrs,
+      {name, index, array, getPublicUrl, onNavigate, node} = vnode.attrs,
       isLast = vnode.attrs.index === array.length - 1;
+    const path = joinPath(...array.slice(0, index + 1));
+    const linkAttrs = { href: getPublicUrl(path) };
+
+    if (node?.id && onNavigate) {
+      // Preload the target by UUID; m.route.Link still performs the
+      // path-based navigation and keeps modifier clicks working.
+      linkAttrs.onclick = () => onNavigate(node, path);
+    }
 
     return m("li.breadcrumb-item", {
       class: isLast ? "active" : null,
-    }, isLast ? name : m(m.route.Link, {
-      href: getPublicUrl(joinPath(...array.slice(0, index + 1))),
-    }, name))
+    }, isLast ? name : m(m.route.Link, linkAttrs, name))
   }
 }
 
@@ -27,7 +33,8 @@ export class BreadcrumbsView {
       return null
     }
 
-    const pathArray = ["", ...this.FsNodeList.current.path.split('/').filter(Boolean)];
+    const pathArray = ["", ...this.FsNodeList.pathSegments];
+    const nodes = this.FsNodeList.breadcrumbNodes || [];
 
     return (
       m("div.card",
@@ -39,6 +46,8 @@ export class BreadcrumbsView {
                 index,
                 array,
                 getPublicUrl: this.getPublicUrl,
+                onNavigate: vnode.attrs.onNavigate,
+                node: nodes[index - 1],
               })
             ))),
             vnode.attrs.actions,

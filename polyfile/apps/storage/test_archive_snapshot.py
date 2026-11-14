@@ -1,5 +1,4 @@
 from io import StringIO
-from pathlib import PurePosixPath
 from unittest.mock import patch
 
 from django.core.management import call_command
@@ -149,7 +148,7 @@ class ArchiveSnapshotTests(TestCase):
     def test_deleting_a_file_inside_the_root_keeps_the_snapshot(self) -> None:
         job = create_archive_job(self.user, self.root)
 
-        remove_fs_node(self.user, PurePosixPath("/root/a.txt"))
+        remove_fs_node(self.user, self.file1.pk)
 
         job.refresh_from_db()
         self.assertEqual(job.status, FsNodeArchiveJob.Status.PENDING)
@@ -159,7 +158,7 @@ class ArchiveSnapshotTests(TestCase):
     def test_deleting_the_root_cancels_the_job_and_releases_the_manifest(self) -> None:
         job = create_archive_job(self.user, self.root)
 
-        remove_fs_node(self.user, PurePosixPath("/root"))
+        remove_fs_node(self.user, self.root.pk)
 
         job.refresh_from_db()
         self.assertEqual(job.status, FsNodeArchiveJob.Status.CANCELLED)

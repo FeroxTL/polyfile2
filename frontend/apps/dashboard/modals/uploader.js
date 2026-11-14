@@ -1,4 +1,3 @@
-import {joinPath} from "@polyfile/core/utils/urls";
 import {DashboardFsNode} from "../models/DashboardFsNode";
 import {DashboardFsNodeList} from "../services/DashboardFsNodeList";
 import { API_V1_FSNODE_TOUCH } from "../constants/endpoints";
@@ -12,11 +11,9 @@ const uploadFile = (e) => (
     // Create FsNode
     m.request(API_V1_FSNODE_TOUCH, {
       method: "POST",
-      headers: {
-        "Content-Type": "core/json",
-      },
-      params: {
-        "path": joinPath(DashboardFsNodeList.current.path, file.name),
+      body: {
+        parent_id: DashboardFsNodeList.current?.id || null,
+        name: file.name,
       },
     })
     .then((data) => {

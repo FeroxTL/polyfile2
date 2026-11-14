@@ -67,11 +67,13 @@ class FsNodeListRequestParams(typing.TypedDict):
 class FsNodeListRequestSchema(Schema):
     """File list filter params."""
     # TODO: add sorting, add fields limit, add limit/offset
-    path = PathField(required=True)
+    path = PathField(required=False, load_default=PurePosixPath('/'))
 
 
 class FsNodeItemSchema(Schema):
     """FsNode list response - child items."""
+    id = fields.UUID(dump_only=True, allow_none=True)
+    parent_id = fields.UUID(dump_only=True, allow_none=True)
     name = fields.Str(required=True, allow_none=False)
     type = fields.Str(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
@@ -124,7 +126,6 @@ class FsNodeItemWithShareSchema(FsNodeItemSchema):
 
 class FsNodeCurrentSchema(FsNodeItemSchema):
     """FsNode list response - current node."""
-    path = fields.Str(required=True, allow_none=False)
 
 
 class FsNodeCurrentWithShareSchema(FsNodeCurrentSchema):
@@ -132,18 +133,33 @@ class FsNodeCurrentWithShareSchema(FsNodeCurrentSchema):
     share = fields.Method("get_share", dump_only=True, allow_none=True)
 
 
+class FsNodeAncestorSchema(Schema):
+    """FsNode list response - ancestor breadcrumb item."""
+    id = fields.UUID(dump_only=True)
+    name = fields.Str(dump_only=True)
+
+
 class FsNodeListResponseSchema(Schema):
     """FsNode list response."""
     current = fields.Nested(FsNodeCurrentWithShareSchema())
+    ancestors = fields.Nested(FsNodeAncestorSchema(), many=True, dump_only=True)
     children = fields.Nested(FsNodeItemWithShareSchema(), many=True)
 
 
-# == FsNode create directory ==
+# == FsNode create ==
 
 
-class FsNodeCreateRequestSchema(Schema):
-    """FsNode create params."""
-    path = PathField(required=True)
+# Cross-platform reserved characters (Windows/NTFS compatible), see AGENTS.md.
+RESERVED_NAME_CHARACTERS = frozenset('<>:"/\\|?*')
+
+
+def _validate_name_characters(value: str) -> None:
+    """Reject names with characters that are unsafe across supported platforms."""
+    bad = RESERVED_NAME_CHARACTERS.intersection(value)
+    if bad:
+        raise marshmallow.ValidationError(
+            f'Name contains reserved characters: {" ".join(sorted(bad))}',
+        )
 
 
 def get_fs_node_name_validator() -> fields.validate.Validator:
@@ -152,12 +168,13 @@ def get_fs_node_name_validator() -> fields.validate.Validator:
     # TODO: add OS compatibility settings (maybe user.compat_devices)
     return validate.And(
         validate.Length(min=1, error='Directory name is empty'),
+        validate.Length(max=255, error='Name is too long (255 characters max)'),
         validate.NoneOf(('..', '.'), error='Directory name can not be "." or ".."'),
+        _validate_name_characters,
     )
 
 
-# == FsNode remove ==
-
-class FsNodeRemoveRequestSchema(Schema):
-    """FsNode remove params."""
-    path = PathField(required=True)
+class FsNodeCreateByNameRequestSchema(Schema):
+    """FsNode create params (UUID identity): parent UUID + name."""
+    parent_id = fields.UUID(required=False, allow_none=True, load_default=None)
+    name = fields.Str(required=True, validate=get_fs_node_name_validator())

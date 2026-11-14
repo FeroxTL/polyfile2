@@ -9,6 +9,7 @@
     <title>Polyfile</title>
     <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'fs_node_browse' '/' %}" />
     <script id="dashboard-urls" type="application/json">{{dashboard_urls|safe}}</script>
+    {{ initial_fs_node|json_script:"initial-fs-node" }}
     {% render_bundle 'vendor' 'css' %}
     {% render_bundle 'dashboard' 'css' %}
   </head>

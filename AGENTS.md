@@ -60,11 +60,14 @@ To ensure cross-platform compatibility (Windows, macOS, Linux, and Cloud Storage
     - Use double quotes (`"`) for strings as the project standard; we are gradually transitioning away from single quotes.
 
 ## 6. API & Integration
-- **Path-based Routing**: The API should be accessible via logical paths (e.g., `/api/files/folder/file.txt`).
-- **Recursive Tree Format**: The API for listing nodes should return a recursive structure:
+- **UUID identity**: mutations address nodes by `FsNode.id` (UUID). Create via `parent_id + name`, delete via `DELETE /api/v1/fs-node/<uuid:node_id>/`, share via `POST /api/shares/` with `node_id`.
+- **Path-based reading**: browser URLs and read endpoints stay path-based: `/api/v1/fs-node/?path=...`, `/files/<path>`, `/s/<token>/<path>`. UUID lookup is also available: `GET /api/v1/fs-node/<uuid:node_id>/`. The dashboard SPA loads by UUID when it already knows the node (double-click preload, breadcrumb preload, server-embedded `initial-fs-node`) and falls back to the path lookup.
+- **Recursive Tree Format**: The API for listing nodes returns the node, its ancestors (root → parent, clipped at the share root for public shares) and its children:
   ```json
   {
     "current": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "parent_id": "6a2e8400-e29b-41d4-a716-446655440001",
       "name": "string",
       "type": "directory|file",
       "created_at": "timestamp",
@@ -72,15 +75,18 @@ To ensure cross-platform compatibility (Windows, macOS, Linux, and Cloud Storage
       "size": 0,
       "mime_type": "string",
       "md5": "string",
-      "file": "path_to_file",
-      "download_url": "string",
-      "path": "/..."
+      "file": "object_key",
+      "download_url": "string"
     },
+    "ancestors": [
+      {"id": "b1c2...", "name": "parent-dir"}
+    ],
     "children": [
-      { "name": "...", "type": "...", ... }
+      { "id": "...", "parent_id": "...", "name": "...", "type": "..." }
     ]
   }
   ```
+  The virtual root has `"id": null` and empty `ancestors`. There is no `path` field: the frontend derives the display path from `ancestors` + `current.name` (hiding the share root's name for public shares).
 
 ## 7. Frontend Component Standards
 - **Named Exports**: Always use named exports for components instead of default exports.

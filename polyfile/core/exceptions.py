@@ -23,6 +23,13 @@ class NotFound(HttpException):
     description = _('Not found.')
 
 
+class BadRequest(HttpException):
+    """Malformed request (e.g. invalid JSON body)."""
+    status_code = 400
+    error_code = 'BadRequest'
+    description = _('Bad request.')
+
+
 class Unauthorized(HttpException):
     """Unauthorized request."""
     status_code = 401

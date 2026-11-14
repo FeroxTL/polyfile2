@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { encodePath, joinPath } from "../urls";
+import { encodePath, joinPath, normalizePath } from "../urls";
 
 describe("joinPath() utility", () => {
   it("should join simple paths", () => {
@@ -53,5 +53,25 @@ describe("encodePath() utility", () => {
     expect(encodePath("")).toBe("");
     expect(encodePath(null)).toBe("");
     expect(encodePath(emptyObject.missing)).toBe("");
+  });
+});
+
+describe("normalizePath() utility", () => {
+  it("adds the leading slash and strips trailing slashes", () => {
+    expect(normalizePath("root/sub/")).toBe("/root/sub");
+    expect(normalizePath("/root/sub")).toBe("/root/sub");
+  });
+
+  it("collapses repeated slashes", () => {
+    expect(normalizePath("//root///sub//")).toBe("/root/sub");
+  });
+
+  it("returns the root path for empty and nullish values", () => {
+    const emptyObject = {};
+
+    expect(normalizePath("")).toBe("/");
+    expect(normalizePath("/")).toBe("/");
+    expect(normalizePath(null)).toBe("/");
+    expect(normalizePath(emptyObject.missing)).toBe("/");
   });
 });

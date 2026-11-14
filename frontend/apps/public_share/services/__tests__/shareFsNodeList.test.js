@@ -6,17 +6,17 @@ import { ShareFsNodeListService } from "../shareFsNodeList";
 const file = {
   name: "file.txt",
   type: "file",
-  path: "/file.txt",
+  parent_id: null,
 };
 const directory = {
   name: "docs",
   type: "directory",
-  path: "/docs",
+  parent_id: null,
 };
 const child = {
   name: "notes.txt",
   type: "file",
-  path: "/docs/notes.txt",
+  parent_id: "33333333-3333-3333-3333-333333333333",
 };
 
 describe("ShareFsNodeListService.load()", () => {
@@ -36,6 +36,8 @@ describe("ShareFsNodeListService.load()", () => {
     expect(service.elements).toHaveLength(1);
     expect(service.elements[0].name).toBe(file.name);
     expect(service.elements[0].type).toBe("file");
+    // The shared file renders as the share root itself.
+    expect(service.path).toBe("/");
   });
 
   it("keeps rendering directory children as list items", async () => {
@@ -49,5 +51,6 @@ describe("ShareFsNodeListService.load()", () => {
 
     expect(service.elements).toHaveLength(1);
     expect(service.elements[0].name).toBe(child.name);
+    expect(service.path).toBe("/");
   });
 });

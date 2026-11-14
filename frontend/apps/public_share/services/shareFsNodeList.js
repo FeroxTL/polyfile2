@@ -1,6 +1,12 @@
 import {FsNodeList} from "@polyfile/core/services/FsNodeList";
 
 export class ShareFsNodeListService extends FsNodeList {
+  constructor() {
+    super();
+    // The ancestor chain starts at the share root; its name stays hidden.
+    this.stripShareRoot = true;
+  }
+
   load(url, params) {
     return super.load(url, params).then(() => {
       if (!this.has_error && this.current?.type === "file") {

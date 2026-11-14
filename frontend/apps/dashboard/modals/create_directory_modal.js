@@ -1,4 +1,3 @@
-import {joinPath} from "@polyfile/core/utils/urls";
 import {DashboardFsNode} from "../models/DashboardFsNode";
 import {DashboardFsNodeList} from "../services/DashboardFsNodeList";
 import {
@@ -35,7 +34,10 @@ const sendRequest = (vnode) => {
   return m.request({
     method: "POST",
     url: API_V1_FSNODE_MKDIR,
-    params: { path: joinPath(DashboardFsNodeList.current.path, vnode.state.valueStream()) },
+    body: {
+      parent_id: DashboardFsNodeList.current?.id || null,
+      name: vnode.state.valueStream(),
+    },
   }).then((data) => {
     closeModal(vnode.attrs.modalId);
     const fsNode = new DashboardFsNode(data);
@@ -111,4 +113,4 @@ const CreateDirectoryModal = {
   }
 };
 
-export default CreateDirectoryModal;
+export { CreateDirectoryModal, sendRequest as sendCreateDirectoryRequest };

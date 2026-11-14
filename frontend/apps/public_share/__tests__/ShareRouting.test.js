@@ -3,21 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import m from "mithril";
 
 const rootResponse = {
-  current: {name: "shared", type: "directory", path: "/"},
+  current: {id: "22222222-2222-2222-2222-222222222222", parent_id: null, name: "shared", type: "directory"},
   ancestors: [],
-  children: [{name: "child", type: "directory", path: "/child"}],
+  children: [{id: "33333333-3333-3333-3333-333333333333", parent_id: "22222222-2222-2222-2222-222222222222", name: "child", type: "directory"}],
 };
 
 const childResponse = {
-  current: {name: "child", type: "directory", path: "/child"},
-  ancestors: [{name: "shared", type: "directory", path: "/"}],
+  current: {id: "33333333-3333-3333-3333-333333333333", parent_id: "22222222-2222-2222-2222-222222222222", name: "child", type: "directory"},
+  ancestors: [{id: "22222222-2222-2222-2222-222222222222", name: "shared"}],
   children: [],
 };
 
 const flushPromises = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
 describe("public share routing", () => {
-  let requestCount;
+  let requestCount = 0;
 
   beforeEach(() => {
     requestCount = 0;

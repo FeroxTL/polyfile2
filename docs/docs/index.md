@@ -16,8 +16,11 @@ directory tree without holding an HTTP request open for minutes.
 ## What that means in practice
 
 - **Directories are virtual.** Creating a directory adds a node to the tree; it does not have to create a real
-  folder on disk. The hierarchy is stored as parent-child relationships and resolved with recursive CTEs
-  (`django-cte`), so full paths are computed in SQL instead of by walking the filesystem.
+  folder on disk. The hierarchy is stored as parent-child relationships; paths are resolved by indexed
+  per-level lookups and ancestor chains are computed with a recursive CTE (`django-cte`).
+- **Nodes are addressed by UUID, paths are for humans.** Every mutation (create, delete, share) takes the node's
+  `FsNode.id`, while reading and browser URLs stay path-based. API responses carry both: `id`/`parent_id`/
+  `ancestors` for navigation and a derived `path` for display.
 - **Paths are logical, not physical.** A path like `/projects/2026/report.pdf` identifies a node in Polyfile's
   tree. Where that file actually lives is decided by the node's `FsStorage` and its backend.
 - **Storage is a configuration detail.** Each user can be assigned an `FsStorage` with its own backend and options.
@@ -35,8 +38,8 @@ directory tree without holding an HTTP request open for minutes.
 
 - **Web file manager (SPA)** — browse the tree, create directories, upload files, download, preview images, and
   delete files or empty directories. Built with Mithril.js and Bootstrap 5.
-- **Path-based REST API** — list nodes and their children, create directories, initiate uploads, delete subtrees,
-  and poll deletion jobs. See the [API reference](operations/api_reference.md).
+- **UUID-identified REST API** — list nodes by path or UUID, create with `parent_id` + `name`, delete subtrees
+  by id, and poll deletion jobs. See the [API reference](operations/api_reference.md).
 - **Backend-agnostic storage** — a common `StorageBackend` contract with a reference local filesystem backend.
   Adding S3, FTP or another provider means implementing the backend, not changing the tree logic.
 - **Public shares** — time-limited and revocable shares, signed download URLs, and a `ShareDownload` audit log of

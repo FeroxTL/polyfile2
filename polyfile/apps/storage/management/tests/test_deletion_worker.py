@@ -1,9 +1,10 @@
 import io
 import signal
 import tempfile
+import uuid
 from datetime import timedelta
 from io import StringIO
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
@@ -108,7 +109,8 @@ class JobStrategyTests(TestCase):
         """Verify that RelationalClaimStrategy uses skip_locked=True and increments the attempts count."""
         job = FsNodeDeletionJob.objects.create(
             owner=self.user,
-            root_path="/unused",
+            root_node_uuid=uuid.uuid4(),
+            root_node_name="unused",
             status=FsNodeDeletionJob.Status.PENDING,
         )
         select_for_update_calls = []
@@ -173,7 +175,8 @@ class DeletionWorkerClaimTests(TestCase):
     def _create_job(self, status=FsNodeDeletionJob.Status.PENDING, **kwargs) -> FsNodeDeletionJob:
         return FsNodeDeletionJob.objects.create(
             owner=self.user,
-            root_path="/unused",
+            root_node_uuid=uuid.uuid4(),
+            root_node_name="unused",
             status=status,
             **kwargs,
         )
@@ -309,7 +312,8 @@ class DeletionWorkerReanimationTests(TestCase):
     def _create_running_job(self, *, locked_until, attempts=1, **kwargs) -> FsNodeDeletionJob:
         return FsNodeDeletionJob.objects.create(
             owner=self.user,
-            root_path="/unused",
+            root_node_uuid=uuid.uuid4(),
+            root_node_name="unused",
             status=FsNodeDeletionJob.Status.RUNNING,
             locked_by="dead-host:1",
             locked_until=locked_until,
@@ -376,7 +380,8 @@ class DeletionWorkerReanimationTests(TestCase):
         ):
             jobs[status] = FsNodeDeletionJob.objects.create(
                 owner=self.user,
-                root_path="/unused",
+                root_node_uuid=uuid.uuid4(),
+                root_node_name="unused",
                 status=status,
                 locked_until=stale_lock,
                 attempts=1,
@@ -394,7 +399,7 @@ class DeletionWorkerReanimationTests(TestCase):
         FsNodeFileFactory(
             name="file.txt", owner=self.user, storage=self.storage, parent=root, size=3,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, root.pk)
         FsNodeDeletionJob.objects.filter(pk=job.pk).update(
             status=FsNodeDeletionJob.Status.RUNNING,
             locked_by="dead-host:1",
@@ -413,7 +418,7 @@ class DeletionWorkerReanimationTests(TestCase):
         FsNodeFileFactory(
             name="file.txt", owner=self.user, storage=self.storage, parent=root, size=3,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, root.pk)
         FsNodeDeletionJob.objects.filter(pk=job.pk).update(
             status=FsNodeDeletionJob.Status.RUNNING,
             locked_by="dead-host:1",
@@ -467,7 +472,7 @@ class DeletionWorkerProcessingTests(TestCase):
         )
 
     def test_deletes_the_whole_subtree_and_completes_the_job(self) -> None:
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
         self.assertEqual(FsNode.objects.count(), 5)
 
         run_worker()
@@ -481,7 +486,7 @@ class DeletionWorkerProcessingTests(TestCase):
         self.assertEqual(FsNode.active.count(), 0)
 
     def test_processed_nodes_match_the_subtree(self) -> None:
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -501,7 +506,7 @@ class DeletionWorkerProcessingTests(TestCase):
         FsNodeFileFactory(
             name="deep.txt", owner=self.user, storage=self.storage, parent=parent, size=1,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -518,7 +523,7 @@ class DeletionWorkerProcessingTests(TestCase):
                 parent=self.subdir,
                 size=index,
             )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker(batch_size=3)
 
@@ -534,7 +539,7 @@ class DeletionWorkerProcessingTests(TestCase):
         active_file = FsNodeFileFactory(
             name="keep.txt", owner=self.user, storage=self.storage, parent=active_dir, size=5,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -547,14 +552,14 @@ class DeletionWorkerProcessingTests(TestCase):
 
     def test_worker_once_leaves_other_pending_jobs_untouched(self) -> None:
         """Verify that the 'once' worker only affects what it's supposed to and leaves other pending jobs untouched."""
-        first_job = remove_fs_node(self.user, PurePosixPath("/root"))
+        first_job = remove_fs_node(self.user, self.root.pk)
         keep_dir = FsNodeDirectoryFactory(
             name="keep", owner=self.user, storage=self.storage,
         )
         keep_file = FsNodeFileFactory(
             name="keep.txt", owner=self.user, storage=self.storage, parent=keep_dir, size=5,
         )
-        second_job = remove_fs_node(self.user, PurePosixPath("/keep"))
+        second_job = remove_fs_node(self.user, keep_dir.pk)
         FsNodeDeletionJob.objects.filter(pk=second_job.pk).update(
             scheduled_at=now() + timedelta(minutes=5),
         )
@@ -572,11 +577,11 @@ class DeletionWorkerProcessingTests(TestCase):
     def test_empty_job_is_completed(self) -> None:
         """Verify handling of jobs with no nodes."""
         with self.assertRaises(FsNodeNotFoundError):
-            remove_fs_node(self.user, PurePosixPath("/nothing"))
+            remove_fs_node(self.user, uuid.uuid4())
 
     def test_job_is_failed_when_attempt_limit_is_already_exceeded(self) -> None:
         """Verify failure when max attempts reached."""
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
         FsNodeDeletionJob.objects.filter(pk=job.pk).update(attempts=5)
 
         run_worker(max_attempts=1)
@@ -588,7 +593,7 @@ class DeletionWorkerProcessingTests(TestCase):
 
     def test_unexpected_exception_marks_the_job_failed(self) -> None:
         """Verify exception handling during processing."""
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         with patch.object(DeletionWorker, "_process_job", side_effect=RuntimeError("boom")):
             run_worker()
@@ -601,7 +606,7 @@ class DeletionWorkerProcessingTests(TestCase):
 
     def test_database_error_returns_job_to_pending_for_retry(self) -> None:
         """A database error during processing should allow retry instead of failing permanently."""
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         with patch.object(DeletionWorker, "_process_job", side_effect=DatabaseError("db down")):
             run_worker()
@@ -612,7 +617,7 @@ class DeletionWorkerProcessingTests(TestCase):
 
     def test_database_error_becomes_timeout_after_max_attempts(self) -> None:
         """A database error should eventually time out if retries are exhausted."""
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
         FsNodeDeletionJob.objects.filter(pk=job.pk).update(attempts=5)
 
         with patch.object(DeletionWorker, "_process_job", side_effect=DatabaseError("db down")):
@@ -625,7 +630,7 @@ class DeletionWorkerProcessingTests(TestCase):
 
     def test_completed_job_is_not_processed_again(self) -> None:
         """Verify idempotency of processing."""
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
         run_worker()
         FsNodeDeletionJob.objects.filter(pk=job.pk).update(
             status=FsNodeDeletionJob.Status.PENDING,
@@ -640,7 +645,7 @@ class DeletionWorkerProcessingTests(TestCase):
 
     def test_deletion_job_status_endpoint_reports_worker_result(self) -> None:
         """Verify API response for job status."""
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
         self.client.force_login(self.user)
 
         run_worker()
@@ -670,7 +675,7 @@ class DeletionWorkerProgressTests(TestCase):
 
     def test_worker_calculates_total_nodes_when_job_has_no_totals(self) -> None:
         """Verify total node calculation if the counter was not filled in advance."""
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
         FsNodeDeletionJob.objects.filter(pk=job.pk).update(total_nodes=0)
 
         run_worker()
@@ -681,10 +686,10 @@ class DeletionWorkerProgressTests(TestCase):
 
     def test_directory_only_job_has_node_progress(self) -> None:
         """Verify node progress for an empty directory."""
-        FsNodeDirectoryFactory(
+        empty_dir = FsNodeDirectoryFactory(
             name="empty", owner=self.user, storage=self.storage, parent=self.root,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root/empty"))
+        job = remove_fs_node(self.user, empty_dir.pk)
 
         run_worker()
 
@@ -724,7 +729,7 @@ class DeletionWorkerStorageTests(TestCase):
         """Verify physical file deletion."""
         file1 = self._create_file_node("f1.txt", b"first")
         file2 = self._create_file_node("f2.txt", b"second")
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -744,7 +749,7 @@ class DeletionWorkerStorageTests(TestCase):
             parent=self.root,
             size=4,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -775,7 +780,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
             parent=self.root,
             size=5,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -814,7 +819,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
             parent=self.root,
             size=5,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -859,7 +864,7 @@ class DeletionWorkerStorageFailureTests(TestCase):
     #         parent=self.root,
     #         size=5,
     #     )
-    #     job = remove_fs_node(self.user, PurePosixPath("/root"))
+    #     job = remove_fs_node(self.user, self.root.pk)
     #
     #     run_worker()
     #
@@ -893,7 +898,7 @@ class DeletionWorkerProtectionTests(TestCase):
         self.item = FsNodeArchiveItemFactory(node=self.file)
 
     def test_protected_file_reschedules_job_without_touching_rows_or_outbox(self) -> None:
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker()
 
@@ -907,7 +912,7 @@ class DeletionWorkerProtectionTests(TestCase):
         self.assertFalse(PendingObjectDeletion.objects.exists())
 
     def test_job_completes_after_protection_is_removed(self) -> None:
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
         run_worker()
         job.refresh_from_db()
         self.assertEqual(job.status, FsNodeDeletionJob.Status.PENDING)
@@ -1008,7 +1013,7 @@ class DeletionWorkerTinyBatchTests(TestCase):
         FsNodeFileFactory(
             name="deep.txt", owner=self.user, storage=self.storage, parent=parent, size=1,
         )
-        job = remove_fs_node(self.user, PurePosixPath("/root"))
+        job = remove_fs_node(self.user, self.root.pk)
 
         run_worker(batch_size=1)
 
