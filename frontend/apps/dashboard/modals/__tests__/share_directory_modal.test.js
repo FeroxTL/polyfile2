@@ -7,7 +7,7 @@ vi.mock("../../bootstrap/modal", () => ({
 }));
 
 import { closeModal } from "../../bootstrap/modal";
-import { ShareDirectoryModal } from "../share_directory_modal";
+import { ShareDirectoryModal, isShareActive, resolveShareStatus } from "../share_directory_modal";
 
 // Mock ShareService
 const { mockCreate, mockRevoke } = vi.hoisted(() => ({
@@ -128,6 +128,67 @@ describe("ShareDirectoryModal.submit()", () => {
     });
     expect(onUpdate).toHaveBeenCalledWith(mockData);
     expect(vnode.state.formExpiresAt).toBe("");
+  });
+});
+
+describe("ShareDirectoryModal status", () => {
+  const expiredShare = {
+    id: "token",
+    url: null,
+    status: "expired",
+    expires_at: "2020-01-01T00:00:00.000Z",
+    revoked_at: null,
+  };
+
+  it("shows an expired notice and badge for an expired share", () => {
+    const vnode = createVnode({ share: expiredShare });
+
+    const body = JSON.stringify(ShareDirectoryModal.renderBody(vnode));
+
+    expect(body).toContain("has expired");
+    expect(body).toContain("Expired");
+    expect(body).toContain("Reactivate share");
+  });
+
+  it("derives the expired status from expires_at when the API omits status", () => {
+    const share = {
+      id: "token",
+      url: "https://example.com/s/token/",
+      expires_at: "2020-01-01T00:00:00.000Z",
+    };
+
+    expect(resolveShareStatus(share)).toBe("expired");
+    expect(isShareActive(share)).toBe(false);
+
+    const vnode = createVnode({ share });
+    const body = JSON.stringify(ShareDirectoryModal.renderBody(vnode));
+
+    expect(body).toContain("has expired");
+    expect(body).toContain("\"disabled\":true");
+  });
+
+  it("prioritizes revocation over expiration", () => {
+    const share = {
+      id: "token",
+      url: null,
+      status: "revoked",
+      expires_at: "2020-01-01T00:00:00.000Z",
+      revoked_at: "2021-01-01T00:00:00.000Z",
+    };
+
+    expect(resolveShareStatus(share)).toBe("revoked");
+
+    const body = JSON.stringify(ShareDirectoryModal.renderBody(createVnode({ share })));
+
+    expect(body).toContain("has been revoked");
+  });
+
+  it("does not show a lifecycle notice for an active share", () => {
+    const body = JSON.stringify(ShareDirectoryModal.renderBody(createVnode()));
+
+    expect(body).toContain("Active");
+    expect(body).not.toContain("has expired");
+    expect(body).not.toContain("has been revoked");
   });
 });
 

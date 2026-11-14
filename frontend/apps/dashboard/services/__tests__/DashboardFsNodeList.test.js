@@ -173,4 +173,26 @@ describe("DashboardFsNodeListService UUID preload", () => {
     // The marker is consumed even on a mismatch to avoid stale skips.
     expect(service.consumePendingPath("/docs")).toBe(false);
   });
+
+  it("loads by UUID without a pending path when the path is not known yet", async () => {
+    vi.spyOn(m, "request").mockResolvedValue({
+      current: { id: NODE_ID, parent_id: null, name: "docs", type: "directory" },
+      ancestors: [],
+      children: [],
+    });
+    const service = new DashboardFsNodeListService();
+
+    await service.loadByNodeId(NODE_ID);
+
+    expect(service.path).toBe("/docs");
+    expect(service.consumePendingPath("/docs")).toBe(false);
+  });
+
+  it("marks an already loaded path for the next route match", () => {
+    const service = new DashboardFsNodeListService();
+
+    service.markPathPending("docs/");
+
+    expect(service.consumePendingPath("/docs")).toBe(true);
+  });
 });

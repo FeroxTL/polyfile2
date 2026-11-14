@@ -43,7 +43,7 @@ def serve_file(request: HttpRequest, fs_node: FsNode, skip_permission_check: boo
     return FileResponse(
         fs_node.file.open("rb"),
         filename=fs_node.name,
-        content_type=fs_node.mime_type or 'core/octet-stream',
+        content_type=fs_node.mime_type or 'application/octet-stream',
         as_attachment=request.GET.get('disposition') == 'attachment',
         headers={'Last-Modified': http_date(fs_node_timestamp)},
     )

@@ -19,18 +19,28 @@ export class DashboardFsNodeListService extends FsNodeList {
   }
 
   /**
-   * Load a node by UUID ahead of a path-based route change.
+   * Load a node by UUID, optionally marking the route path it belongs to.
    *
-   * The readable URL stays path-based, so `consumePendingPath()` lets the
-   * route handler skip the duplicate path-based lookup.
+   * When `expectedPath` is known (double-click, breadcrumbs), the marker lets
+   * the route handler skip the duplicate path-based lookup.
    *
    * @param {string} nodeId - UUID of the directory to open.
-   * @param {string} expectedPath - Path the route is about to show.
+   * @param {string|null} [expectedPath] - Path the route is about to show.
    * @returns {Promise<void>}
    */
-  loadByNodeId(nodeId, expectedPath) {
-    this.pendingPath = normalizePath(expectedPath);
+  loadByNodeId(nodeId, expectedPath = null) {
+    this.pendingPath = expectedPath === null ? null : normalizePath(expectedPath);
     return this.load(m.buildPathname(API_V1_FSNODE_BY_ID, { id: nodeId }), {});
+  }
+
+  /**
+   * Mark an already loaded path so the next route match reuses the data.
+   *
+   * @param {string} path - Path the route is about to show.
+   * @returns {void}
+   */
+  markPathPending(path) {
+    this.pendingPath = normalizePath(path);
   }
 
   /**

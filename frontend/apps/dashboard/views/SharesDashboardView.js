@@ -1,6 +1,7 @@
 import m from "mithril";
 import { FsNodeList } from "@polyfile/core/services/FsNodeList";
 import { DashboardShell } from "../components/DashboardShell";
+import { DashboardFsNodeList } from "../services/DashboardFsNodeList";
 import { ShareList } from "../services/ShareList";
 import { showPermanentDeleteShareModal } from "../modals/permanent_delete_share_modal";
 import { API_V1_FSNODE_BY_ID, FILES_DASHBOARD_URL } from "../constants/endpoints";
@@ -56,6 +57,9 @@ const SharesDashboardView = {
   /**
    * The share list API intentionally omits node paths; resolve the path lazily
    * from the by-id endpoint (which returns the ancestor chain) on navigation.
+   *
+   * Directories are loaded straight into the dashboard list, so the route
+   * handler reuses that response instead of fetching the same node by path.
    */
   async navigateToNode(share) {
     const nodeId = share?.root_fs_node?.id;
@@ -63,15 +67,22 @@ const SharesDashboardView = {
       return;
     }
 
+    if (getNodeType(share) === "directory") {
+      await DashboardFsNodeList.loadByNodeId(nodeId);
+      // A deleted or otherwise unreachable node cannot be navigated to.
+      if (DashboardFsNodeList.has_error || DashboardFsNodeList.current === null) {
+        return;
+      }
+      const { path } = DashboardFsNodeList;
+      DashboardFsNodeList.markPathPending(path);
+      m.route.set(FILES_DASHBOARD_URL, { path });
+      return;
+    }
+
     const list = new FsNodeList();
     await list.load(m.buildPathname(API_V1_FSNODE_BY_ID, { id: nodeId }), {});
     // A deleted or otherwise unreachable node cannot be navigated to.
     if (list.has_error || list.current === null) {
-      return;
-    }
-
-    if (getNodeType(share) === "directory") {
-      m.route.set(FILES_DASHBOARD_URL, { path: list.path });
       return;
     }
     m.route.set(FILES_DASHBOARD_URL, { path: this.getParentPath(list.path) });
@@ -110,11 +121,23 @@ const SharesDashboardView = {
       nodeId: share?.root_fs_node?.id || null,
       type: getNodeType(share),
       onUpdate: (data) => {
+        if (data === null) {
+          Object.assign(share, {
+            url: null,
+            expires_at: null,
+            revoked_at: new Date().toISOString(),
+            status: "revoked",
+          });
+          return;
+        }
+
         Object.assign(share, {
-          url: data?.url || null,
-          expires_at: data?.expires_at || null,
-          revoked_at: data === null ? new Date().toISOString() : data.revoked_at,
-          status: data?.status || "revoked",
+          // Reactivating a revoked share rotates its token; keep the id in sync.
+          id: data.id,
+          url: data.url || null,
+          expires_at: data.expires_at || null,
+          revoked_at: data.revoked_at || null,
+          status: data.status,
         });
       },
     });

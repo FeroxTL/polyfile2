@@ -43,7 +43,7 @@ The system supports asynchronous recursive directory deletion.
 - Reads stay path-based for browser URLs (`/files/<path>`, `/s/<token>/<path>`) and also support `GET /api/v1/fs-node/<uuid:node_id>/`.
 - The dashboard loads a directory by UUID whenever it already knows it: double-clicks and breadcrumb clicks preload the target by UUID before the path-based route change, and the server embeds the initial node UUID into the HTML (`initial-fs-node`). The `/files/<path>` URL never changes, and the path lookup remains the fallback (deep links, reloads without matching initial node data, external links).
 - Responses include `id`, `parent_id` and `ancestors` (root → parent, clipped at the share root for public shares). There is no `path` field: the frontend derives the display path from `ancestors` + `current.name` (`FsNodeList.pathSegments` / `FsNodeList.path`), hiding the share root's name for public shares.
-- `FsNode` no longer has a `path` property; paths are derived from the ancestor chain on the client (`FsNodeList.path`), and the share list page resolves the path lazily via `GET /api/v1/fs-node/<uuid:node_id>/` only when the user navigates.
+- `FsNode` no longer has a `path` property; paths are derived from the ancestor chain on the client (`FsNodeList.path`), and the share list page resolves the path lazily via `GET /api/v1/fs-node/<uuid:node_id>/` only when the user navigates. For shared directories that response is reused directly by the dashboard view (`markPathPending` + `consumePendingPath`), so it is not fetched a second time by path.
 
 ## Agent Handoff Context
 - Previous work established the architectural pillars (Storage Service, Signed Tokens).
