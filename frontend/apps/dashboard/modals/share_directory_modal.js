@@ -1,40 +1,42 @@
 import m from "mithril";
 import { Modal, closeModal } from "../bootstrap/modal";
 import Button from "@polyfile/core/ui-kit/button";
-import {Input} from "@polyfile/core/ui-kit/input";
-import {ShareService} from "../services/ShareService";
+import { Input } from "@polyfile/core/ui-kit/input";
+import { ShareService } from "../services/ShareService";
+import {
+  EXPIRATION_PRESETS,
+  PRESET_CUSTOM,
+  PRESET_NEVER,
+  getExpirationSummary,
+  getPresetDate,
+  toDateTimeLocalValue,
+  toExpiresAt,
+  validateExpiration,
+} from "./share_expiration";
 
 const ERROR_CODE_ZERO = 0;
 const COPY_FEEDBACK_TIMEOUT_MS = 2000;
-const DATE_SLICE_LOCALTIME = 16;
+const SAVED_FEEDBACK_TIMEOUT_MS = 2000;
+const AUTO_SAVE_DEBOUNCE_MS = 500;
 
 const STATUS_ACTIVE = "active";
 const STATUS_REVOKED = "revoked";
 const STATUS_EXPIRED = "expired";
+
+const PRESET_CHOOSE = "";
+
+// Mithril cannot schedule a redraw outside a mounted component (e.g. in tests).
+const scheduleRedraw = () => {
+  if (typeof window !== "undefined") {
+    m.redraw();
+  }
+};
 
 const STATUS_BADGES = {
   [STATUS_ACTIVE]: { label: "Active", className: "text-bg-success" },
   [STATUS_EXPIRED]: { label: "Expired", className: "text-bg-warning" },
   [STATUS_REVOKED]: { label: "Revoked", className: "text-bg-secondary" },
 };
-
-/**
- * Convert an ISO timestamp to the local value expected by datetime-local inputs.
- */
-const toDateTimeLocalValue = (value) => {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, DATE_SLICE_LOCALTIME)
-};
-
-/**
- * Convert a datetime-local value to an ISO timestamp, or null to clear expiration.
- */
-const toExpiresAt = (value) => (value ? new Date(value).toISOString() : null);
 
 /**
  * Resolve the lifecycle status of a share.
@@ -67,6 +69,14 @@ const resolveShareStatus = (share) => {
 };
 
 const isShareActive = (share) => resolveShareStatus(share) === STATUS_ACTIVE;
+const isShareRevoked = (share) => resolveShareStatus(share) === STATUS_REVOKED;
+
+const getInitialPreset = (share) => {
+  if (isShareRevoked(share)) {
+    return PRESET_CHOOSE;
+  }
+  return share?.expiresAt ? PRESET_CUSTOM : PRESET_NEVER;
+};
 
 const formatDetail = (detail) => {
   if (Array.isArray(detail)) {
@@ -110,31 +120,63 @@ function SharedNode(data) {
 const ShareDirectoryModal = {
   oninit(vnode) {
     const { share } = vnode.attrs;
-    vnode.state.share = share && new SharedNode(share);
-    vnode.state.formExpiresAt = toDateTimeLocalValue(vnode.state.share?.expiresAt);
-    vnode.state.loading = false;
-    vnode.state.error = null;
-    vnode.state.copied = false;
-    vnode.state.copyError = null;
-    vnode.state.revoked = false;
+    const { state } = vnode;
+
+    state.share = share && new SharedNode(share);
+    state.shareLink = state.share?.url || "";
+    // Revoked shares need an explicit expiration choice to be reactivated.
+    state.preset = getInitialPreset(state.share);
+    state.formExpiresAt = toDateTimeLocalValue(state.share?.expiresAt);
+    state.savedFormExpiresAt = state.formExpiresAt;
+    state.savedPreset = state.preset;
+    state.loading = false;
+    state.saving = false;
+    state.saveQueued = false;
+    state.saveStatus = null;
+    state.saveTimer = null;
+    state.savedTimer = null;
+    state.expirationError = null;
+    state.error = null;
+    state.copied = false;
+    state.copyError = null;
+    state.revoked = false;
+  },
+
+  onremove(vnode) {
+    // Flush a pending debounced edit so closing the modal does not lose it.
+    if (vnode.state.saveTimer) {
+      ShareDirectoryModal.commitCustomExpiration(vnode);
+    }
+    clearTimeout(vnode.state.saveTimer);
+    clearTimeout(vnode.state.savedTimer);
   },
 
   submit(vnode) {
-    if (vnode.state.loading) {
+    const { state } = vnode;
+    if (state.loading) {
       return;
     }
 
-    vnode.state.loading = true;
-    vnode.state.error = null;
-    vnode.state.revoked = false;
+    if (state.preset === PRESET_CUSTOM) {
+      state.expirationError = validateExpiration(state.formExpiresAt);
+      if (state.expirationError) {
+        return;
+      }
+    }
+
+    state.loading = true;
+    state.error = null;
+    state.revoked = false;
 
     const { nodeId, onUpdate } = vnode.attrs;
-    const expiresAt = toExpiresAt(vnode.state.formExpiresAt);
+    const expiresAt = toExpiresAt(state.formExpiresAt);
 
     ShareService.create(nodeId, expiresAt)
       .then((data) => {
-        vnode.state.share = data && new SharedNode(data);
-        vnode.state.shareLink = vnode.state.share?.url || "";
+        state.share = data && new SharedNode(data);
+        state.shareLink = state.share?.url || "";
+        state.savedFormExpiresAt = state.formExpiresAt;
+        state.savedPreset = state.preset;
 
         if (typeof onUpdate === "function") {
           onUpdate(data);
@@ -142,42 +184,172 @@ const ShareDirectoryModal = {
         return data;
       })
       .catch((error) => {
-        vnode.state.error = getDetailFromError(error);
+        state.error = getDetailFromError(error);
       })
       .finally(() => {
-        vnode.state.loading = false;
+        state.loading = false;
+      });
+  },
+
+  setPreset(vnode, value) {
+    const { state } = vnode;
+    const preset = EXPIRATION_PRESETS.find((option) => option.value === value);
+
+    if (!preset) {
+      return;
+    }
+
+    clearTimeout(state.saveTimer);
+    state.saveTimer = null;
+    state.preset = value;
+    state.expirationError = null;
+
+    if (value === PRESET_CUSTOM) {
+      // Reveal the exact date. A revoked share reactivates with a valid date.
+      if (isShareRevoked(state.share) && !validateExpiration(state.formExpiresAt)) {
+        ShareDirectoryModal.saveExpiration(vnode);
+      }
+      return;
+    }
+
+    state.formExpiresAt = value === PRESET_NEVER
+      ? ""
+      : toDateTimeLocalValue(getPresetDate(preset).toISOString());
+
+    ShareDirectoryModal.saveExpiration(vnode);
+  },
+
+  setCustomExpiration(vnode, value) {
+    const { state } = vnode;
+
+    state.formExpiresAt = value;
+    state.expirationError = null;
+    clearTimeout(state.saveTimer);
+    state.saveTimer = setTimeout(() => {
+      ShareDirectoryModal.commitCustomExpiration(vnode);
+      scheduleRedraw();
+    }, AUTO_SAVE_DEBOUNCE_MS);
+  },
+
+  commitCustomExpiration(vnode) {
+    const { state } = vnode;
+
+    clearTimeout(state.saveTimer);
+    state.saveTimer = null;
+
+    if (state.preset !== PRESET_CUSTOM) {
+      ShareDirectoryModal.saveExpiration(vnode);
+      return;
+    }
+
+    state.expirationError = validateExpiration(state.formExpiresAt);
+    if (!state.expirationError) {
+      ShareDirectoryModal.saveExpiration(vnode);
+    }
+  },
+
+  saveExpiration(vnode) {
+    const { state } = vnode;
+
+    if (!state.share) {
+      return;
+    }
+
+    if (state.saving) {
+      state.saveQueued = true;
+      return;
+    }
+
+    const { formExpiresAt, preset } = state;
+
+    if (formExpiresAt === state.savedFormExpiresAt && preset === state.savedPreset) {
+      return;
+    }
+
+    state.saving = true;
+    state.saveQueued = false;
+    state.saveStatus = "saving";
+    state.error = null;
+    state.expirationError = null;
+    scheduleRedraw();
+
+    const expiresAt = toExpiresAt(formExpiresAt);
+    const { nodeId, onUpdate } = vnode.attrs;
+
+    ShareService.create(nodeId, expiresAt)
+      .then((data) => {
+        state.share = data ? new SharedNode(data) : state.share;
+        state.shareLink = state.share?.url || "";
+        state.savedFormExpiresAt = formExpiresAt;
+        state.savedPreset = preset;
+        state.saveStatus = "saved";
+
+        clearTimeout(state.savedTimer);
+        state.savedTimer = setTimeout(() => {
+          state.saveStatus = null;
+          scheduleRedraw();
+        }, SAVED_FEEDBACK_TIMEOUT_MS);
+
+        if (typeof onUpdate === "function") {
+          onUpdate(data);
+        }
+      })
+      .catch((error) => {
+        state.error = getDetailFromError(error);
+        state.saveStatus = null;
+
+        // Keep a newer edit if the user changed the value while saving.
+        if (state.formExpiresAt === formExpiresAt) {
+          state.preset = state.savedPreset;
+          state.formExpiresAt = state.savedFormExpiresAt;
+        }
+      })
+      .finally(() => {
+        state.saving = false;
+
+        if (state.saveQueued) {
+          state.saveQueued = false;
+          ShareDirectoryModal.saveExpiration(vnode);
+        }
+        scheduleRedraw();
       });
   },
 
   revoke(vnode) {
     const { onUpdate } = vnode.attrs;
-    const { share } = vnode.state;
+    const { state } = vnode;
 
-    if (vnode.state.loading || !share) {
+    if (state.loading || state.saving || !state.share) {
       return;
     }
 
-    vnode.state.loading = true;
-    vnode.state.error = null;
+    state.loading = true;
+    state.error = null;
 
-    ShareService.revoke(share)
+    ShareService.revoke(state.share)
       .then(() => {
-        vnode.state.share = null;
-        vnode.state.shareLink = "";
-        vnode.state.copied = false;
-        vnode.state.copyError = null;
-        vnode.state.revoked = true;
-        vnode.state.formExpiresAt = "";
+        state.share = null;
+        state.shareLink = "";
+        state.copied = false;
+        state.copyError = null;
+        state.revoked = true;
+        state.preset = PRESET_NEVER;
+        state.formExpiresAt = "";
+        state.savedFormExpiresAt = "";
+        state.savedPreset = PRESET_NEVER;
+        state.saveStatus = null;
+        state.expirationError = null;
+        clearTimeout(state.saveTimer);
 
         if (typeof onUpdate === "function") {
           onUpdate(null);
         }
       })
       .catch((error) => {
-        vnode.state.error = getDetailFromError(error);
+        state.error = getDetailFromError(error);
       })
       .finally(() => {
-        vnode.state.loading = false;
+        state.loading = false;
       });
   },
 
@@ -188,7 +360,7 @@ const ShareDirectoryModal = {
 
     if (!navigator.clipboard) {
       state.copyError = "Clipboard is not available. Please copy the link manually.";
-      m.redraw();
+      scheduleRedraw();
       return;
     }
 
@@ -196,43 +368,81 @@ const ShareDirectoryModal = {
       .then(() => {
         state.copied = true;
         state.copyError = null;
-        m.redraw();
+        scheduleRedraw();
         setTimeout(() => {
           state.copied = false;
-          m.redraw();
+          scheduleRedraw();
         }, COPY_FEEDBACK_TIMEOUT_MS);
       })
       .catch(() => {
         state.copyError = "Could not copy the link. Please copy it manually.";
-        m.redraw();
+        scheduleRedraw();
       });
   },
 
+  renderSaveStatus(vnode) {
+    const { saveStatus } = vnode.state;
+
+    if (saveStatus === "saving") {
+      return m("span.text-muted.small", "Saving…");
+    }
+
+    if (saveStatus === "saved") {
+      return m("span.text-success.small", [
+        m("i.fa.fa-check.me-1[aria-hidden=true]"),
+        "Saved",
+      ]);
+    }
+
+    return null;
+  },
+
   renderExpiration(vnode) {
+    const { state } = vnode;
+    const isCustom = state.preset === PRESET_CUSTOM;
+    let summary = getExpirationSummary(state.formExpiresAt);
+
+    if (state.preset === PRESET_CHOOSE) {
+      summary = "Choose when the new link should expire.";
+    } else if (isCustom && !state.formExpiresAt) {
+      summary = "Choose an expiration date.";
+    }
+
     return m(".mb-3", [
-      m("label.form-label", "Expiration (optional)"),
-      m(Input, {
+      m(".d-flex.justify-content-between.align-items-center.mb-1", [
+        m("label.form-label.mb-0[for=share-expiration]", "Expiration"),
+        this.renderSaveStatus(vnode),
+      ]),
+      m("select.form-select#share-expiration", {
+        value: state.preset,
+        disabled: state.loading,
+        onchange: (event) => this.setPreset(vnode, event.target.value),
+      }, [
+        state.preset === PRESET_CHOOSE && m("option", { value: PRESET_CHOOSE }, "Choose expiration…"),
+        ...EXPIRATION_PRESETS.map((preset) => m(
+          "option",
+          { value: preset.value },
+          preset.label
+        )),
+      ]),
+      isCustom && m(Input, {
         type: "datetime-local",
-        value: toDateTimeLocalValue(vnode.state.formExpiresAt),
-        oninput: (event) => {
-          vnode.state.formExpiresAt = event.target.value;
-        },
+        value: state.formExpiresAt,
+        className: "mt-2",
+        oninput: (event) => this.setCustomExpiration(vnode, event.target.value),
       }),
-      m(".form-text", "Leave empty for a link that does not expire."),
+      state.expirationError && m(".text-danger.small.mt-1", state.expirationError),
+      m(".form-text", summary),
     ]);
   },
 
-  renderCreateAction(vnode) {
+  renderCreateBody(vnode) {
     const isDirectory = vnode.attrs.type === "directory";
     return m(".mb-3", [
       m("p", isDirectory
-        ? "Click the button below to create a public sharing link for this directory."
-        : "Click the button below to create a public sharing link for this file."),
+        ? "Create a public sharing link for this directory and choose when it expires."
+        : "Create a public sharing link for this file and choose when it expires."),
       this.renderExpiration(vnode),
-      m(Button, {
-        type: "submit",
-        disabled: vnode.state.loading,
-      }, "Create Share Link"),
     ]);
   },
 
@@ -242,14 +452,14 @@ const ShareDirectoryModal = {
     if (status === STATUS_EXPIRED) {
       return m(".alert.alert-warning", [
         m("p.mb-1", "This public link has expired and can no longer be opened."),
-        m("p.mb-0", "Set a new expiration in the future and click \"Reactivate share\" to make it available again."),
+        m("p.mb-0", "Choose a new expiration below to reactivate it. Changes are applied automatically."),
       ]);
     }
 
     if (status === STATUS_REVOKED) {
       return m(".alert.alert-secondary", [
         m("p.mb-1", "This public link has been revoked and can no longer be opened."),
-        m("p.mb-0", "Set an expiration below (or leave it empty) and click \"Reactivate share\" to create a new link."),
+        m("p.mb-0", "Choose an expiration below (or \"Never expires\") to create a new link. Changes are applied automatically."),
       ]);
     }
 
@@ -292,14 +502,6 @@ const ShareDirectoryModal = {
           onclick: () => this.copyToClipboard(state),
         }, state.copied ? "Copied!" : "Copy"),
       ]),
-      m(".mt-3", [
-        this.renderExpiration(vnode),
-        m(Button, {
-          type: "submit",
-          class: "btn-outline-primary",
-          disabled: state.loading,
-        }, active ? "Update expiration" : "Reactivate share"),
-      ]),
     ]);
   },
 
@@ -310,14 +512,47 @@ const ShareDirectoryModal = {
       state.copyError && m(".alert alert-warning", state.copyError),
       state.revoked && m(".alert alert-success", "The share link has been revoked."),
       state.share && this.renderStatusNotice(vnode),
-      !state.share && !state.loading && this.renderCreateAction(vnode),
+      !state.share && !state.loading && this.renderCreateBody(vnode),
       state.share && this.renderShareLink(vnode),
+      state.share && this.renderExpiration(vnode),
       state.loading && m(".spinner-border text-primary", {}),
     ]);
   },
 
+  renderFooter(vnode) {
+    const { state } = vnode;
+
+    if (!state.share) {
+      return m(".modal-footer", [
+        m(Button, {
+          type: "button",
+          class: "btn-secondary",
+          onclick: () => closeModal(vnode.attrs.modalId),
+        }, "Cancel"),
+        m(Button, {
+          type: "submit",
+          disabled: state.loading,
+        }, "Create link"),
+      ]);
+    }
+
+    return m(".modal-footer", [
+      m(Button, {
+        type: "button",
+        class: "btn-outline-danger me-auto",
+        disabled: state.loading || state.saving,
+        onclick: () => this.revoke(vnode),
+      }, "Revoke"),
+      m(Button, {
+        type: "button",
+        class: "btn-secondary",
+        onclick: () => closeModal(vnode.attrs.modalId),
+      }, "Close"),
+    ]);
+  },
+
   view(vnode) {
-    const { type, modalId } = vnode.attrs;
+    const { type } = vnode.attrs;
     const { state } = vnode;
     const title = type === "directory" ? "Share Directory" : "Share File";
 
@@ -329,23 +564,15 @@ const ShareDirectoryModal = {
             m("form.has-validation", {
               onsubmit: (e) => {
                 e.preventDefault();
-                this.submit(vnode);
+                if (state.share) {
+                  this.commitCustomExpiration(vnode);
+                } else {
+                  this.submit(vnode);
+                }
               },
             }, [
               this.renderBody(vnode),
-              m(".modal-footer", [
-                state.share?.url && isShareActive(state.share) && m(Button, {
-                  type: "button",
-                  class: "btn-warning me-auto",
-                  disabled: state.loading,
-                  onclick: () => this.revoke(vnode),
-                }, "Revoke"),
-                m(Button, {
-                  type: "button",
-                  class: "btn-secondary",
-                  onclick: () => closeModal(modalId),
-                }, "Close"),
-              ]),
+              this.renderFooter(vnode),
             ]),
           ])
         ),

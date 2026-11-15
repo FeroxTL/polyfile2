@@ -21,6 +21,7 @@ coverage/
 .playwright-mcp/
 .vitest-secret-token
 npm-cache
+unsloth-*
 
 # build
 dist
