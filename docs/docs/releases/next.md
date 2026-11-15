@@ -14,6 +14,7 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - Public sharing with time-limited, revocable links.
 - HMAC-SHA256 signed download tokens that do not expose internal paths or node ids.
 - Asynchronous recursive directory deletion handled by a background worker.
+- Directory downloads as zip archives handled by an archive worker.
 - In-browser image preview and storage configuration forms in the admin.
 
 ## Added
@@ -23,6 +24,9 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - `ShareDownload` records with IP address, user agent and timestamp for auditing.
 - Recursive deletion via `FsNodeDeletionJob` and the `run_deletion_worker` management
   command, with batch processing, retries and stale-job recovery.
+- Download directories as zip archives via async archive jobs (`FsNodeArchiveJob`) and the
+  `run_archive_worker` background worker, with ZIP delivery through the archive backend and
+  status polling endpoints.
 - Image preview in the SPA.
 - Logout from the SPA.
 - Storage settings forms in the Django admin.

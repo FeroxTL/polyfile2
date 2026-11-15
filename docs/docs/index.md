@@ -36,8 +36,8 @@ directory tree without holding an HTTP request open for minutes.
 
 ## Features
 
-- **Web file manager (SPA)** — browse the tree, create directories, upload files, download, preview images, and
-  delete files or empty directories. Built with Mithril.js and Bootstrap 5.
+- **Web file manager (SPA)** — browse the tree, create directories, upload files, download files and
+  directories (as zip), preview images, and delete files or empty directories. Built with Mithril.js and Bootstrap 5.
 - **UUID-identified REST API** — list nodes by path or UUID, create with `parent_id` + `name`, delete subtrees
   by id, and poll deletion jobs. See the [API reference](operations/api_reference.md).
 - **Backend-agnostic storage** — a common `StorageBackend` contract with a reference local filesystem backend.

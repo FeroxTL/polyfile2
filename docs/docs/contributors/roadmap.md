@@ -31,7 +31,6 @@ Accepted work that is not scheduled for a specific release yet.
 
 ### File management
 - Trash bin with scheduled cleanup
-- Download directories as zip archives
 - Space limits per user, storage and group, with usage display
 - Access tokens with CRUD and per-node permissions
 - Sharing between users
