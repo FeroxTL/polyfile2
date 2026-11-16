@@ -32,8 +32,7 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - Storage settings forms in the Django admin.
 - Hashed API keys for non-session API clients, managed with the
   `create_api_key` management command and the Django admin.
-- A standalone `test_suites/perf_tests/` load-testing harness (locust + httpx) with an API smoke
-  flow, a disk-usage guard and static HTML reports.
+- A standalone load-testing harness (locust + httpx) with an API smoke flow, a disk-usage guard and static HTML reports, living in the separate `polyfile-e2e` project under its `perf_tests/` directory.
 
 ## Changed
 

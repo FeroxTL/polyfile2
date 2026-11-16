@@ -61,43 +61,19 @@ npm run test:coverage
 
 ### Browser end-to-end tests
 
-E2E tests run a real Chromium browser against a live Django server. They live in
-`test_suites/browser_tests/` and use `pytest-playwright` + `pytest-django` with the dedicated
-`polyfile.core.settings_e2e` settings module.
+E2E tests run a real Chromium browser against a live Django server. They live in the separate
+`polyfile-e2e` project, under its `browser_tests/` directory, and use `pytest-playwright` +
+`pytest-django` with the dedicated `polyfile.core.settings_e2e` settings module.
 
-First, install the Playwright browser binaries (one-time):
+Detailed setup and run instructions live in the separate `polyfile-e2e` project.
 
-```bash
-uv run playwright install chromium
-```
+### Performance tests
 
-Run the full E2E suite (rebuilds production frontend assets automatically):
+Load and performance tests use a separate locust + httpx harness (API smoke flow, disk-usage
+guard, static HTML reports). They live in the separate `polyfile-e2e` project, under its
+`perf_tests/` directory.
 
-```bash
-make e2e
-# or directly:
-uv run pytest test_suites/browser_tests -v --browser chromium
-```
-
-For faster local iteration when frontend assets are already built:
-
-```bash
-make e2e-fast
-# or directly:
-set SKIP_FRONTEND_BUILD=1 && uv run pytest test_suites/browser_tests -v --browser chromium
-```
-
-Run a single test file:
-
-```bash
-uv run pytest test_suites/browser_tests/test_login.py -v --browser chromium
-```
-
-Run with a visible browser window (headed mode):
-
-```bash
-uv run pytest test_suites/browser_tests -v --browser chromium --headed
-```
+Detailed setup and run instructions live in the separate `polyfile-e2e` project.
 
 ### From a wheel
 

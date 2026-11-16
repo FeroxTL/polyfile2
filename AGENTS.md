@@ -37,7 +37,6 @@ To ensure cross-platform compatibility (Windows, macOS, Linux, and Cloud Storage
 - **Testing**:
     - **Backend**: Use `django.test` and `unittest`.
     - **Frontend**: Use `vitest` for unit and integration tests.
-    - **Browser E2E**: Use `pytest-playwright` with `pytest-django`'s `live_server`. Tests live in `test_suites/browser_tests/` and rely on the dedicated `polyfile.core.settings_e2e` settings module.
     - Use `factory-boy` for dynamic fixture creation.
     - Use file-based fixtures for large, static datasets where appropriate.
     - **Mandatory**: Every new feature must include tests. Existing tests must be updated/fixed when code changes.

@@ -18,7 +18,6 @@ nav:
       - Configuration for deployment: operations/configuration_for_deployment.md
       - Environment variables: operations/environment_variables.md
       - API reference: operations/api_reference.md
-      - Performance testing: operations/performance_testing.md
   - Roadmap: contributors/roadmap.md
   - Release notes:
       - Overview: releases/index.md
