@@ -45,6 +45,9 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - Storage settings forms in the Django admin.
 - Hashed API keys for non-session API clients, managed with the
   `create_api_key` management command and the Django admin.
+- Temporary IP-based lockout after repeated failed login attempts or invalid API keys,
+  powered by django-axes. Login lockouts render a styled page; API-key lockouts return
+  HTTP 429.
 - A standalone load-testing harness (locust + httpx) with an API smoke flow, a disk-usage guard and static HTML reports, living in the separate `polyfile-e2e` project under its `perf_tests/` directory.
 
 ## Changed
@@ -65,10 +68,15 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - Signed token signatures are verified with constant-time comparison.
 - Share access is validated against expiration, revocation and deleted nodes.
 - API keys are stored as HMAC-SHA256 digests; plaintext tokens are shown only once.
+- Brute-force protection via django-axes: lockouts are based on IP + username for
+  logins and IP for API keys.
 
 ## Upgrade notes
 
-- Apply migrations: `polyfile migrate`.
+- Apply migrations: `polyfile migrate`. This includes django-axes migrations that add
+  `AccessAttempt`, `AccessLog` and related tables.
+- Configure `AXES_BEHIND_PROXY`, `AXES_IPWARE_PROXY_COUNT` and
+  `AXES_IPWARE_META_PRECEDENCE_ORDER` when running behind a reverse proxy.
 - API keys require the new `accounts.0003_apikey` migration. Set
   `API_KEY_HASH_KEY` in production if key hashes should be rotated separately
   from `SECRET_KEY`.

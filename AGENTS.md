@@ -23,7 +23,7 @@ To ensure cross-platform compatibility (Windows, macOS, Linux, and Cloud Storage
 - **Filename Length**: Maximum length for a single filename is **255 characters**.
 - **Character Restrictions**: Filenames must not contain reserved characters: `< > : " / \ | ? *`. We will use a cross-platform safe regex to enforce this.
 - **URL Limits**: Since we use a Path-based API, we must monitor total URL length (limit ~2000 bytes). For very deep nesting, we may need to implement logic to alert the user or suggest restructuring.
-- **Security**: All `FsNode` access must be validated against the owner/permissions before any backend operation.
+- **Security**: All `FsNode` access must be validated against the owner/permissions before any backend operation. Authentication endpoints (login form and API-key authentication) are protected against brute-force attacks using django-axes; configure `AXES_*` environment variables as needed.
 
 ## 4. Tech Stack
 - **Backend**: Django (Standard Views), Marshmallow (Serialization/Deserialization).

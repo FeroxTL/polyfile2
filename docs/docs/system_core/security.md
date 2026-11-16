@@ -26,6 +26,10 @@ Polyfile must ensure users can only access and manipulate their own files, canno
 - **Risk**: Leaked share links or tampered tokens.
 - **Mitigations**: [Signed tokens](sharing_signed_tokens.md) use HMAC-SHA256 with `settings.SECRET_KEY`, constant-time comparison (`hmac.compare_digest`), expiration, and support revocation. Truncated signatures for compact URLs but still verified properly.
 
+### Brute-force attacks
+- **Risk**: Automated guessing of passwords against the login form or API keys against API endpoints.
+- **Mitigations**: [django-axes](https://django-axes.readthedocs.io/) is integrated with the login form and API-key middleware. It locks out a source after a configurable number of failed attempts (default: 5 failures, 10-minute cooloff) based on IP + username for logins and IP for API keys. See [Environment variables](../operations/environment_variables.md) for `AXES_*` settings.
+
 ## Constraints
 
 These constraints are enforced to keep the system portable and safe:

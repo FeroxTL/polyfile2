@@ -18,3 +18,4 @@ MIDDLEWARE = [
     if middleware != "debug_toolbar.middleware.DebugToolbarMiddleware"
 ]
 LOGIN_REDIRECT_URL = "/files/"
+AXES_ENABLED = False

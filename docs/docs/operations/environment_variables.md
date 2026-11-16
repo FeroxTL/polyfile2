@@ -6,13 +6,13 @@ default; use `POLYFILE_ENV_FILE` to point to another file.
 
 ## Core Django Settings
 
-| Variable        | Type   | Default                                    | Description                                                                              |
-|-----------------|--------|--------------------------------------------|------------------------------------------------------------------------------------------|
-| `SECRET_KEY`    | `str`  | `django-insecure-string`                   | Secret key used for cryptographic signing. **Must be changed in production.**            |
-| `API_KEY_HASH_KEY` | `str` | `SECRET_KEY`                             | Pepper for API-key HMAC digests. Set separately to rotate keys independently.            |
-| `DEBUG`         | `bool` | `True` if `runserver` is in `sys.argv`     | Enables debug mode. In production, set to `False` and configure `ALLOWED_HOSTS`.         |
-| `ALLOWED_HOSTS` | `list` | `['localhost', '127.0.0.1']`               | List of allowed host/domain names. When `DEBUG=False`, this must be properly configured. |
-| `DATABASE_URL`  | `str`  | `sqlite:///<POLYFILE_DATA_DIR>/db.sqlite3` | Database connection URL. Supports SQLite, PostgreSQL, MySQL, and others.                 |
+| Variable           | Type   | Default                                    | Description                                                                              |
+|--------------------|--------|--------------------------------------------|------------------------------------------------------------------------------------------|
+| `SECRET_KEY`       | `str`  | `django-insecure-string`                   | Secret key used for cryptographic signing. **Must be changed in production.**            |
+| `API_KEY_HASH_KEY` | `str`  | `SECRET_KEY`                               | Pepper for API-key HMAC digests. Set separately to rotate keys independently.            |
+| `DEBUG`            | `bool` | `True` if `runserver` is in `sys.argv`     | Enables debug mode. In production, set to `False` and configure `ALLOWED_HOSTS`.         |
+| `ALLOWED_HOSTS`    | `list` | `['localhost', '127.0.0.1']`               | List of allowed host/domain names. When `DEBUG=False`, this must be properly configured. |
+| `DATABASE_URL`     | `str`  | `sqlite:///<POLYFILE_DATA_DIR>/db.sqlite3` | Database connection URL. Supports SQLite, PostgreSQL, MySQL, and others.                 |
 
 ## Runtime Paths
 
@@ -57,6 +57,20 @@ installed package requires installing the development dependency explicitly.
 |----------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
 | `WEBPACK_STATS_FILE` | `str` (path) | `webpack-dev-stats.json` in the project root when `DEBUG=True` and the file exists, otherwise `polyfile/webpack-stats.json` | Path to the `webpack-bundle-tracker` stats file used by `django-webpack-loader`.        |
 | `WEBPACK_ASSETS_DIR` | `str` (path) | `web_dev_assets/` in the project root when `DEBUG=True` and the directory exists, otherwise `polyfile/web_assets/`          | Directory containing built frontend assets. Added to `STATICFILES_DIRS` when it exists. |
+
+## Brute-force protection (django-axes)
+
+| Variable                            | Type   | Default                            | Description                                                                          |
+|-------------------------------------|--------|------------------------------------|--------------------------------------------------------------------------------------|
+| `AXES_ENABLED`                      | `bool` | `True`                             | Enable/disable django-axes entirely. Disabled by default in E2E settings.            |
+| `AXES_FAILURE_LIMIT`                | `int`  | `5`                                | Number of failed login/API-key attempts before lockout.                              |
+| `AXES_COOLOFF_TIME`                 | `str`  | `10m`                              | How long a source stays locked (`30s`, `10m`, `1h`). Uses `parse_duration`.          |
+| `AXES_RESET_ON_SUCCESS`             | `bool` | `True`                             | Reset failed attempts after a successful login.                                      |
+| `AXES_HTTP_RESPONSE_CODE`           | `int`  | `429`                              | HTTP status returned on lockout.                                                     |
+| `AXES_BEHIND_PROXY`                 | `bool` | `False`                            | When `True`, resolve client IP from `HTTP_X_FORWARDED_FOR` instead of `REMOTE_ADDR`. |
+| `AXES_IPWARE_META_PRECEDENCE_ORDER` | `list` | `HTTP_X_FORWARDED_FOR,REMOTE_ADDR` | Header search order when `AXES_BEHIND_PROXY=True`.                                   |
+| `AXES_IPWARE_PROXY_COUNT`           | `int`  | `1`                                | Number of trusted proxies in front of the application.                               |
+| `AXES_IPWARE_PROXY_TRUSTED_IPS`     | `list` | empty                              | Trusted proxy IP addresses.                                                          |
 
 ## Notes
 

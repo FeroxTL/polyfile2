@@ -1,0 +1,23 @@
+{% extends "layouts/base_form.html" %}
+{% load i18n %}
+
+{% block title %}{% translate 'Account locked' %}{% endblock %}
+
+{% block errors %}
+  <p class="alert alert-danger">
+    {% blocktranslate trimmed with count=failure_count limit=failure_limit %}
+      Too many failed login attempts ({{ count }} out of {{ limit }}).
+      Please try again later.
+    {% endblocktranslate %}
+    {% if cooloff_timedelta %}
+      <br>
+      {% blocktranslate trimmed %}
+        The lockout will be automatically lifted after the cooldown period.
+      {% endblocktranslate %}
+    {% endif %}
+  </p>
+{% endblock %}
+
+{% block form %}
+  <a class="btn btn-link" href="{% url 'accounts-login' %}">{% translate 'Back to login' %}</a>
+{% endblock %}

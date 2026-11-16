@@ -417,7 +417,7 @@ class ShareDetailApiTests(ShareBaseTest):
     def test_download_inactive_file_share(self) -> None:
         """Check download link in invalid share."""
         share = SharedNodeFactory(owner=self.owner, root_fs_node=self.root_dir, revoked_at=now())
-        self.client.login()
+        self.client.force_login(self.owner)
         file_response = self.client.get(share_download_url(share.token, self.child_file.id))
         self.assertEqual(file_response.status_code, 404)
         # TODO check response.json()
@@ -425,7 +425,7 @@ class ShareDetailApiTests(ShareBaseTest):
     def test_download_invalid_url_sign(self) -> None:
         """Check download link sign."""
         share = SharedNodeFactory(owner=self.owner, root_fs_node=self.root_dir)
-        self.client.login()
+        self.client.force_login(self.owner)
         with mock.patch("polyfile.apps.share.utils.generate_download_token", return_value="foo"):
             file_response = self.client.get(share_download_url(share.token, self.child_file.id))
         self.assertEqual(file_response.status_code, 404)
@@ -434,7 +434,7 @@ class ShareDetailApiTests(ShareBaseTest):
     def test_download_active_directory_share(self) -> None:
         """Check download directory in share."""
         share = SharedNodeFactory(owner=self.owner, root_fs_node=self.root_dir)
-        self.client.login()
+        self.client.force_login(self.owner)
         file_response = self.client.get(share_download_url(share.token, self.root_dir.id))
         self.assertEqual(file_response.status_code, 303)
         self.assertIn("/s/archive/", file_response["Location"])

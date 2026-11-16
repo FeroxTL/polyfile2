@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import os
 import sys
 from pathlib import Path
@@ -44,13 +45,43 @@ DEBUG = env.bool('DEBUG')
 TESTING = "test" in sys.argv or "PYTEST_VERSION" in os.environ
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
+if TESTING:
+    # Keep django-axes warning logs from cluttering the test output.
+    _axes_test_logger = logging.getLogger("axes")
+    _axes_test_logger.setLevel(logging.ERROR)
+
 LOGIN_URL = reverse_lazy('accounts-login')
 LOGIN_REDIRECT_URL = LOGIN_URL
+
+# django-axes brute-force protection
+# https://django-axes.readthedocs.io/
+AXES_ENABLED = env.bool("AXES_ENABLED", True)
+AXES_FAILURE_LIMIT = env.int("AXES_FAILURE_LIMIT", 5)
+AXES_COOLOFF_TIME = parse_duration(env.str("AXES_COOLOFF_TIME", "10m"))
+AXES_RESET_ON_SUCCESS = env.bool("AXES_RESET_ON_SUCCESS", True)
+AXES_LOCKOUT_PARAMETERS = [["ip_address", "username"]]
+AXES_HTTP_RESPONSE_CODE = env.int("AXES_HTTP_RESPONSE_CODE", 429)
+AXES_LOCKOUT_TEMPLATE = "accounts/locked_out.html"
+
+AXES_BEHIND_PROXY = env.bool("AXES_BEHIND_PROXY", False)
+if AXES_BEHIND_PROXY:
+    AXES_IPWARE_META_PRECEDENCE_ORDER = env.list(
+        "AXES_IPWARE_META_PRECEDENCE_ORDER",
+        default=["HTTP_X_FORWARDED_FOR", "REMOTE_ADDR"],
+    )
+    AXES_IPWARE_PROXY_COUNT = env.int("AXES_IPWARE_PROXY_COUNT", 1)
+    AXES_IPWARE_PROXY_TRUSTED_IPS = env.list(
+        "AXES_IPWARE_PROXY_TRUSTED_IPS",
+        default=[],
+    )
+else:
+    AXES_IPWARE_META_PRECEDENCE_ORDER = ["REMOTE_ADDR"]
 
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
+    'axes',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
@@ -91,9 +122,14 @@ MIDDLEWARE = [
     'polyfile.apps.accounts.auth.ApiKeyAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'axes.middleware.AxesMiddleware',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 ROOT_URLCONF = 'polyfile.core.urls'
 WSGI_APPLICATION = 'polyfile.core.wsgi.application'
 

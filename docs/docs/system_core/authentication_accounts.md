@@ -13,13 +13,17 @@ Key aspects:
 ## Authentication flow
 
 - **Login URL**: Configured as `reverse_lazy('accounts-login')` in settings.
-- **Routes**: Account URLs are included from `apps.accounts.urls`. Public auth forms are used (not the Django admin login for end users).
+- **Routes**: Account URLs are included from `apps.accounts.urls`. 
+  Public auth forms are used (not the Django admin login for end users).
 - **Logout**: Available via API endpoint `/api/v1/user/logout/` ([API reference](../operations/api_reference.md)).
-- **Session-based auth**: Standard Django authentication is used; APIs assert `request.user.is_authenticated`.
+- **Session-based auth**: Standard Django authentication is used; APIs assert 
+  `request.user.is_authenticated`. The login form is protected by django-axes:
+  after too many failed attempts the source is locked out with HTTP `429`.
 - **API keys**: Non-session clients can send `Authorization: Bearer pf_...` or
   `X-API-Key: pf_...`. A valid key authenticates the request as its owner; an
   invalid, expired or revoked key returns `401` without falling back to a
-  session.
+  session. Repeated invalid API-key attempts from the same IP are tracked by
+  django-axes and return `429` when the configured failure limit is exceeded.
 
 ## API keys
 

@@ -1,12 +1,9 @@
 from django.contrib.auth.views import LoginView
-from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
-from django.views.decorators.cache import cache_page
 
 from polyfile.apps.accounts.forms import CustomAuthenticationForm
 
 
-@method_decorator(cache_page(60), name='dispatch')
 class CustomLoginView(LoginView):
     """Display the login form and handle the login action."""
     template_name = 'accounts/login.html'

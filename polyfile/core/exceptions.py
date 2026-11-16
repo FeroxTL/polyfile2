@@ -45,6 +45,13 @@ class PermissionDenied(HttpException):
     description = _('You do not have permission to perform this action.')
 
 
+class TooManyRequests(HttpException):
+    """Too many requests (rate limit or brute-force lockout)."""
+    status_code = 429
+    error_code = 'TooManyRequests'
+    description = _('Too many requests. Please try again later.')
+
+
 class FieldValidationError(HttpException):
     # TODO: remove?
     status_code = 400
