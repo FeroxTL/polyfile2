@@ -100,6 +100,7 @@ class FsNodeCreateApiView(CreateApiView):
             parent_id=params["parent_id"],
             name=params["name"],
             fs_node_type=cls.fs_node_type,
+            replace=bool(params.get("replace", False)),
         )
 
     @classmethod
@@ -114,14 +115,22 @@ class FsNodeMkdirApiView(FsNodeCreateApiView):
 
 
 class FsNodeTouchApiView(FsNodeCreateApiView):
-    """Create FsNode(type=file)."""
+    """Create or replace FsNode(type=file)."""
+    serializer_class = schemas.FsNodeTouchRequestSchema
     fs_node_type = FsNode.TypeChoices.FILE
 
     @classmethod
-    def post(cls, request: RequestType) -> http.HttpResponse:
-        """Create FsNode(type=file) and its TempUpload session."""
+    def post(cls, request: RequestType) -> http.JsonResponse:
+        """Create FsNode(type=file) and start a fresh TempUpload session."""
         fs_node = cls.create_node(request)
-        temp_upload = TempUpload.objects.create(fs_node=fs_node)
+        temp_upload, _ = TempUpload.objects.update_or_create(
+            fs_node=fs_node,
+            defaults={
+                "token": uuid.uuid4(),
+                "status": TempUpload.Status.UPLOADING,
+                "completed_on": None,
+            },
+        )
 
         return cls.json_response({
             **schemas.FsNodeItemSchema().dump(fs_node),

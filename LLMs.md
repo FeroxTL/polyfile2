@@ -45,6 +45,13 @@ The system supports asynchronous recursive directory deletion.
 - Responses include `id`, `parent_id` and `ancestors` (root → parent, clipped at the share root for public shares). There is no `path` field: the frontend derives the display path from `ancestors` + `current.name` (`FsNodeList.pathSegments` / `FsNodeList.path`), hiding the share root's name for public shares.
 - `FsNode` no longer has a `path` property; paths are derived from the ancestor chain on the client (`FsNodeList.path`), and the share list page resolves the path lazily via `GET /api/v1/fs-node/<uuid:node_id>/` only when the user navigates. For shared directories that response is reused directly by the dashboard view (`markPathPending` + `consumePendingPath`), so it is not fetched a second time by path.
 
+## Upload queue & replacement (done)
+- The SPA upload queue is `frontend/apps/dashboard/services/UploadManager.js`: sequential uploads, per-file states (`queued`/`creating`/`uploading`/`conflict`/`error`/`done`/`canceled`), byte-weighted overall progress, `retry`, `replace`, `skip`, `cancelAll`, and a `beforeunload` guard while `hasPendingWork` is true.
+- UI lives in `frontend/apps/dashboard/modals/upload_monitor.js`: `UploadMonitorDocked` (fixed bottom-right panel, desktop) and `UploadMonitorModal` (mobile). The actions menu is custom (no Bootstrap JS) and uses fixed positioning so the panel or modal cannot clip it.
+- `POST /api/v1/fs-node/touch` accepts `replace: true`. An existing file node is reused, preserving its UUID and share links; directories cannot be replaced.
+- Conflict responses (`409 FsNodeExistsError`) include `existing_node_id` and `existing_type`. `HttpException.extra` fields are merged into API error JSON.
+- `save_upload()` writes replacements to a fresh object key and queues the previous key in `PendingObjectDeletion` only after the new content is stored. `run_deletion_worker` drains that outbox.
+
 ## Agent Handoff Context
 - Previous work established the architectural pillars (Storage Service, Signed Tokens).
 - The UUID identity migration is complete; path-based mutations are removed.

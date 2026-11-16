@@ -189,7 +189,6 @@ def upload_file_view(request: HttpRequest, token: str):
         temp_upload: TempUpload = TempUpload.objects.select_related('fs_node').get(
             token=token,
             status=TempUpload.Status.UPLOADING,
-            fs_node__object_key='',
             fs_node__deleted_at__isnull=True,
         )
     except TempUpload.DoesNotExist:

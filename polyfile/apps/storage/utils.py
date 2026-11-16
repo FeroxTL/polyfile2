@@ -170,6 +170,7 @@ def create_fs_node(
         parent_id: uuid.UUID | None,
         name: str,
         fs_node_type: FsNode.TypeChoices,
+        replace: bool = False,
 ) -> FsNode:
     """
     Create FsNode by parent UUID and name.
@@ -178,8 +179,10 @@ def create_fs_node(
     :param parent_id: target directory UUID; None means the virtual root.
     :param name: new node name (no path separators).
     :param fs_node_type: type of FSNode to be created.
+    :param replace: reuse an existing file node with the same name instead of
+        raising a conflict. Directories can never be replaced.
     :raises HttpException: most of the errors.
-    :return: created FSNode.
+    :return: created or reused FSNode.
     """
     assert user.storage_id is not None
 
@@ -212,8 +215,17 @@ def create_fs_node(
         },
     )
     if not created:
+        if replace and fs_node_type == FsNode.TypeChoices.FILE and fs_node.is_file:
+            return fs_node
+
+        existing_kind = "Directory" if fs_node.is_directory else "File"
         raise exceptions.FsNodeExistsError(
-            detail=f'{fs_node_type.name.capitalize()} named "{name}" already exists')
+            detail=f'{existing_kind} named "{name}" already exists',
+            extra={
+                "existing_node_id": str(fs_node.pk),
+                "existing_type": fs_node.type,
+            },
+        )
     return fs_node
 
 

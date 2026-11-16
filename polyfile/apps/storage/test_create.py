@@ -9,7 +9,7 @@ from polyfile.apps.storage.factories import (
     FsNodeFileFactory,
     StorageFactory,
 )
-from polyfile.apps.storage.models import FsNode, TempUpload
+from polyfile.apps.storage.models import FsNode, PendingObjectDeletion, TempUpload
 from polyfile.apps.storage.utils import create_fs_node, remove_fs_node
 from polyfile.core.exceptions import (
     FsNodeExistsError,
@@ -41,8 +41,26 @@ class CreateFsNodeByNameTests(TestCase):
         self.assertEqual(node.parent_id, self.root.pk)
 
     def test_duplicate_name_is_rejected(self) -> None:
-        with self.assertRaises(FsNodeExistsError):
+        with self.assertRaises(FsNodeExistsError) as ctx:
             create_fs_node(self.user, None, "root", FsNode.TypeChoices.DIRECTORY)
+        self.assertEqual(ctx.exception.extra["existing_node_id"], str(self.root.pk))
+        self.assertEqual(ctx.exception.extra["existing_type"], FsNode.TypeChoices.DIRECTORY)
+
+    def test_replace_reuses_an_existing_file(self) -> None:
+        node = create_fs_node(
+            self.user, None, "notes.txt", FsNode.TypeChoices.FILE, replace=True,
+        )
+
+        self.assertEqual(node.pk, self.file.pk)
+
+    def test_replace_does_not_reuse_a_directory(self) -> None:
+        with self.assertRaises(FsNodeExistsError) as ctx:
+            create_fs_node(
+                self.user, None, "root", FsNode.TypeChoices.FILE, replace=True,
+            )
+
+        self.assertEqual(ctx.exception.extra["existing_node_id"], str(self.root.pk))
+        self.assertEqual(ctx.exception.extra["existing_type"], FsNode.TypeChoices.DIRECTORY)
 
     def test_foreign_parent_is_not_found(self) -> None:
         other_user = UserFactory(storage=self.storage)
@@ -156,3 +174,69 @@ class FsNodeCreateByNameApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error_id"], "BadRequest")
+
+    def test_touch_conflict_reports_the_existing_node(self) -> None:
+        response = self.client.post(
+            reverse("fs_node_touch"),
+            data=json.dumps({"parent_id": None, "name": "notes.txt"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+        self.assertEqual(data["error_id"], "FsNodeExistsError")
+        self.assertEqual(data["existing_node_id"], str(self.file.pk))
+        self.assertEqual(data["existing_type"], FsNode.TypeChoices.FILE)
+
+    def test_touch_replace_reuses_the_file_and_refreshes_temp_upload(self) -> None:
+        temp_upload = TempUpload.objects.create(fs_node=self.file)
+        temp_upload.mark_complete()
+        old_token = temp_upload.token
+
+        response = self.client.post(
+            reverse("fs_node_touch"),
+            data=json.dumps({"parent_id": None, "name": "notes.txt", "replace": True}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        data = response.json()
+        self.assertEqual(data["id"], str(self.file.pk))
+        self.assertIn("upload_url", data)
+
+        temp_upload.refresh_from_db()
+        self.assertNotEqual(temp_upload.token, old_token)
+        self.assertEqual(temp_upload.status, TempUpload.Status.UPLOADING)
+        self.assertIsNone(temp_upload.completed_on)
+
+    def test_touch_replace_rejects_a_directory_with_the_same_name(self) -> None:
+        response = self.client.post(
+            reverse("fs_node_touch"),
+            data=json.dumps({"parent_id": None, "name": "root", "replace": True}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+        self.assertEqual(data["existing_node_id"], str(self.root.pk))
+        self.assertEqual(data["existing_type"], FsNode.TypeChoices.DIRECTORY)
+
+    def test_upload_replaces_content_and_queues_the_old_object(self) -> None:
+        old_object_key = "uploads/old-notes.txt"
+        FsNode.objects.filter(pk=self.file.pk).update(object_key=old_object_key)
+        temp_upload = TempUpload.objects.create(fs_node=self.file)
+
+        response = self.client.post(
+            reverse("upload_file", kwargs={"token": temp_upload.token}),
+            data=b"replacement content",
+            content_type="application/octet-stream",
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.file.refresh_from_db()
+        self.assertEqual(self.file.size, len(b"replacement content"))
+        self.assertNotEqual(self.file.object_key, old_object_key)
+        self.assertTrue(PendingObjectDeletion.objects.filter(
+            storage_id=self.storage.pk,
+            object_key=old_object_key,
+        ).exists())

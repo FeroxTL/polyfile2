@@ -15,7 +15,6 @@ This is the committed scope for the next release. Items move to the
 
 | Area | Feature | Status |
 | --- | --- | --- |
-| SPA | Upload queue | Planned |
 | Authentication | Password reset | Planned |
 | Authentication | Temporary IP ban after repeated failed logins | Planned |
 

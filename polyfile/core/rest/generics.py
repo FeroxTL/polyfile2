@@ -3,7 +3,6 @@ import json
 from django import http
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponseRedirect, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -38,6 +37,7 @@ class AnonymousApiView(View):
                 "error_id": e.error_code,
                 "description": e.description,
                 "detail": e.detail,
+                **e.extra,
             }, status=e.status_code)
 
 
@@ -46,11 +46,11 @@ class BaseApiView(LoginRequiredMixin, AnonymousApiView):
     """Base view for all api views."""
 
     @staticmethod
-    def json_response(data: dict, status: int = 200) -> JsonResponse:
+    def json_response(data: dict, status: int = 200) -> http.JsonResponse:
         """Build a JSON response with an explicit Content-Type."""
         return http.JsonResponse(data, status=status)
 
-    def handle_no_permission(self) -> HttpResponseRedirect | JsonResponse:
+    def handle_no_permission(self) -> http.HttpResponseRedirect | http.JsonResponse:
         if wants_html(self.request):
             return http.HttpResponseRedirect(settings.LOGIN_URL)
 
@@ -96,6 +96,6 @@ class CreateApiView(BaseApiView):
         raise NotImplementedError
 
     @classmethod
-    def post(cls, request: RequestType) -> JsonResponse:
+    def post(cls, request: RequestType) -> http.HttpResponse:
         """Handle POST by creating the resource and wrapping it in JSON."""
         return cls.json_response(cls.create(request))

@@ -27,7 +27,7 @@ Backends are registered in `polyfile.apps.storage.handler.registered_backends` a
 `FsNode.file` is a composite Python attribute backed by two database columns: `storage_id` (the selected `FsStorage`) and `object_key` (the key/path inside that storage). The real column that stores the object key is named `file` in the database for historical reasons, but the ORM field is `object_key`.
 
 ### Integration with the file tree
-- **Creation**: When creating a file through the [API](../operations/api_reference.md), a [FsNode](models_data_model.md#fsnode) is created first (with metadata), then `upload_service.save_upload()` streams the uploaded content into the backend and updates the node with `size`, `md5`, and `mime_type`.
+- **Creation**: When creating a file through the [API](../operations/api_reference.md), a [FsNode](models_data_model.md#fsnode) is created first (with metadata), then `upload_service.save_upload()` streams the uploaded content into the backend and updates the node with `size`, `md5`, and `mime_type`. Replacing an existing file reuses its node and writes the new bytes to a fresh object key.
 - **Download**: The backend provides `download_url()` which typically points to Polyfile's download view (e.g., for [FileSystemBackend](#file-system-backend) it reverses to `download_file`). `serve_file()` uses `FsNode.file.open()` to stream bytes.
 - **Deletion**: Physical deletion is coordinated with [recursive deletion](recursive_deletion_background_jobs.md). The deletion worker collects files to remove and calls `delete_many()` on the appropriate backend for efficient bulk removal. Backends report per-file results (`True` on success or "file not found", or an `Exception` on failure).
 
@@ -41,11 +41,13 @@ Configured via [FsStorage.options](models_data_model.md#fsstorage). At minimum i
 ### Upload flow
 File uploads in Polyfile use a two-step flow tied to [TempUpload](models_data_model.md#tempupload):
 
-1. **Initiate** - Client calls the API to create a file [FsNode](models_data_model.md#fsnode). A `TempUpload` is created with a token and the API returns an `upload_url`.
+1. **Initiate** - Client calls the API to create a file [FsNode](models_data_model.md#fsnode). A `TempUpload` is created with a token and the API returns an `upload_url`. For a replacement (`replace: true` on touch), the existing node is reused and its `TempUpload` is refreshed with a new token.
 
 2. **Upload** - Client sends raw file bytes to that upload URL (see [API reference](../operations/api_reference.md)).
 
 3. **Store** - `upload_service.save_upload()` reads the request body into a spooled temporary file, computes MD5 and MIME type, then calls `backend.save()` to publish the object atomically (via a temporary `.part` file and `os.replace`). It updates the `FsNode` with `size`, `md5`, and `mime_type`.
+
+4. **Replace** - When the node already has content, the new object is written to a fresh key (the base key plus a random suffix). Only after that write succeeds does the node point at the new object and the previous key go into `PendingObjectDeletion`. The [deletion worker](recursive_deletion_background_jobs.md) removes queued objects in batches. A failed replacement therefore leaves the old file untouched, and the node's UUID, metadata and share links stay valid.
 
 ### Deletion
 `FileSystemBackend.delete_many()` unlinks files directly with `os.unlink()`. It treats `FileNotFoundError` as success (idempotent) and collects other `OSError` instances as failures in the results dict.

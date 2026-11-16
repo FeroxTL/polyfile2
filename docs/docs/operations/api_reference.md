@@ -65,10 +65,19 @@ Returns the current node, its ancestors (breadcrumb chain, root first) and its c
 **JSON body:**
 - `name` (required) - File name
 - `parent_id` (optional, default `null`) - UUID of the parent directory
+- `replace` (optional, default `false`) - Reuse an existing file with the same name
+  instead of returning `409`
 
 **Requirements:** User must have `storage_id` configured.
 
-**Behavior:** Creates a file [FsNode](../system_core/models_data_model.md#fsnode) and a [TempUpload](../system_core/models_data_model.md#tempupload) token. Returns node data plus `upload_url` for uploading raw content.
+**Behavior:** Creates a file [FsNode](../system_core/models_data_model.md#fsnode) and a
+[TempUpload](../system_core/models_data_model.md#tempupload) token. Returns node data plus
+`upload_url` for uploading raw content. Every call issues a fresh `TempUpload` token in the
+`uploading` state, including when an existing file is replaced.
+
+With `replace: true` an existing file with the same name is reused: its `id`, `parent_id`,
+`share` and other node metadata are preserved, and the upload writes new content. Directories
+can never be replaced. If the name belongs to a directory, the request still returns `409`.
 
 **Response (example):**
 ```json
@@ -79,6 +88,21 @@ Returns the current node, its ancestors (breadcrumb chain, root first) and its c
   "upload_url": "/upload/<token>/"
 }
 ```
+
+**Conflict response:** When the name is taken and `replace` is not set, the error carries
+the existing node so a client can offer replacement:
+
+```json
+{
+  "error_id": "FsNodeExistsError",
+  "description": "Target object already exists.",
+  "detail": "File named \"report.pdf\" already exists",
+  "existing_node_id": "6a2e8400-e29b-41d4-a716-446655440001",
+  "existing_type": "file"
+}
+```
+
+`existing_type` is `file` or `directory`; only files can be replaced.
 
 See [Storage backends](../system_core/storage_backends.md#upload-flow) for upload details.
 
@@ -127,7 +151,10 @@ See [Sharing & signed tokens](../system_core/sharing_signed_tokens.md) for the f
 
 ## Upload & download
 
-- **Upload**: `POST /upload/<token>/` - Upload raw file content using token from [TempUpload](../system_core/models_data_model.md#tempupload) (handled by storage views)
+- **Upload**: `POST /upload/<token>/` - Upload raw file content using token from
+  [TempUpload](../system_core/models_data_model.md#tempupload) (handled by storage views).
+  The node may already have content when a file is being replaced; the new bytes are stored
+  under a fresh object key and the old object is queued for deletion.
 
 - **Download**: `GET /download/<uuid:pk>/` - Download file via controlled view using backend's [download_url()](../system_core/storage_backends.md#abstraction-layer)
 
@@ -157,6 +184,19 @@ Uses custom exceptions from `polyfile.core.exceptions`:
 - `BadRequest` for malformed JSON bodies
 - `NotFound` for missing resources
 - `InvalidUserStorageError` when user has no storage configured
+
+Errors share a common JSON shape. Exceptions may add extra fields, which are merged into
+the response body:
+
+```json
+{
+  "error_id": "FsNodeExistsError",
+  "description": "Target object already exists.",
+  "detail": "File named \"report.pdf\" already exists",
+  "existing_node_id": "...",
+  "existing_type": "file"
+}
+```
 
 All errors should follow [Security](../system_core/security.md) practices (clear messages, no leaking sensitive info).
 

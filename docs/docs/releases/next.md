@@ -15,6 +15,7 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - HMAC-SHA256 signed download tokens that do not expose internal paths or node ids.
 - Asynchronous recursive directory deletion handled by a background worker.
 - Directory downloads as zip archives handled by an archive worker.
+- In-browser upload queue with a live progress monitor and conflict-aware replacement.
 - In-browser image preview and storage configuration forms in the admin.
 
 ## Added
@@ -27,6 +28,18 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - Download directories as zip archives via async archive jobs (`FsNodeArchiveJob`) and the
   `run_archive_worker` background worker, with ZIP delivery through the archive backend and
   status polling endpoints.
+- An upload queue in the SPA that uploads files sequentially and shows per-file state,
+  overall byte progress and a completed/total file count.
+- A docked upload monitor in the bottom-right corner on desktop and a standard modal on
+  mobile, reachable from the navbar with a badge for active uploads.
+- Inline conflict handling: replace the existing file, skip it, or retry network and server
+  failures. Canceling aborts in-flight requests and removes placeholder nodes created by the
+  queue.
+- A `beforeunload` confirmation while uploads are still pending.
+- File replacement through `replace: true` on `POST /api/v1/fs-node/touch`. The existing
+  `FsNode` is reused, so its UUID and share links keep working.
+- Conflict responses include `existing_node_id` and `existing_type`, so clients can tell
+  whether the name belongs to a file that can be replaced.
 - Image preview in the SPA.
 - Logout from the SPA.
 - Storage settings forms in the Django admin.
@@ -38,6 +51,13 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 
 - `DELETE` requests for non-empty directories now return `202 Accepted` with a job id
   instead of deleting synchronously.
+- `POST /api/v1/fs-node/touch` accepts an optional `replace` flag (default `false`) and
+  issues a fresh `TempUpload` token on every call, including replacements.
+- Replacing a file uploads to a fresh object key and switches the node only after the new
+  content is stored. The previous object is queued for deletion, so a failed upload leaves
+  the current file untouched.
+- API error responses now forward any extra fields attached to the exception (for example,
+  conflict details), in addition to `error_id`, `description` and `detail`.
 - The SPA handles node creation and rename ordering correctly.
 
 ## Security
@@ -54,5 +74,8 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
   from `SECRET_KEY`.
 - Run the deletion worker as a separate process: `polyfile run_deletion_worker`.
   `runserver` does not start it, and recursive deletions stay pending without it.
+- The deletion worker also drains `PendingObjectDeletion`, which now receives the previous
+  object of every replaced file. Without the worker, replaced content stays on disk even
+  though the database already points to the new object.
 - Public sharing depends on `SECRET_KEY`; keep it stable and secret, otherwise existing
   signed download links will stop validating.

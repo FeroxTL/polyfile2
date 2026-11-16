@@ -28,7 +28,8 @@ directory tree without holding an HTTP request open for minutes.
   implementation task rather than an API change.
 - **Uploads are explicit two-step transfers.** Creating a file returns a `TempUpload` token and an upload URL; the
   raw bytes are sent separately. That keeps metadata creation, validation, MD5 calculation, MIME detection and the
-  actual transfer under the application's control.
+  actual transfer under the application's control. Replacing a file reuses its node and writes new bytes to a fresh
+  object key, so node ids and share links stay stable.
 - **Deletion is asynchronous by design.** Removing a directory returns `202 Accepted` with a job id. A background
   worker walks the subtree leaf-first, removes physical files in batches and cleans up the database records.
 - **Public sharing uses signed, expiring tokens.** Share links do not expose node ids or internal paths. Download
@@ -36,8 +37,9 @@ directory tree without holding an HTTP request open for minutes.
 
 ## Features
 
-- **Web file manager (SPA)** — browse the tree, create directories, upload files, download files and
-  directories (as zip), preview images, and delete files or empty directories. Built with Mithril.js and Bootstrap 5.
+- **Web file manager (SPA)** — browse the tree, create directories, upload files through a
+  sequential queue with a live progress monitor, download files and directories (as zip),
+  preview images, and delete files or empty directories. Built with Mithril.js and Bootstrap 5.
 - **UUID-identified REST API** — list nodes by path or UUID, create with `parent_id` + `name`, delete subtrees
   by id, and poll deletion jobs. See the [API reference](operations/api_reference.md).
 - **Backend-agnostic storage** — a common `StorageBackend` contract with a reference local filesystem backend.
@@ -81,7 +83,8 @@ uv run python manage.py run_deletion_worker
 ```
 
 `runserver` does **not** start the deletion worker. Without it, `DELETE` requests still return `202 Accepted`
-and create a deletion job, but the physical files are never removed and the jobs stay pending.
+and create a deletion job, but the physical files are never removed and the jobs stay pending. The worker also
+drains objects queued by file replacement, which are no longer referenced by any node.
 
 Open `http://127.0.0.1:8000`, sign in, and assign an `FsStorage` to your user in the Django admin before creating
 files. The full sequence, including the wheel-based installation, is in

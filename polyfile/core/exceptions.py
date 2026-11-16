@@ -9,8 +9,9 @@ class HttpException(Exception):
     error_code: str = 'unknown'
     description: str = _('A server error occurred.')
 
-    def __init__(self, detail: typing.Any = None):
+    def __init__(self, detail: typing.Any = None, extra: dict[str, typing.Any] | None = None):
         self.detail: typing.Any = detail or self.description
+        self.extra: dict[str, typing.Any] = extra or {}
 
     def __str__(self) -> str:
         return f'{self.error_code}: {self.description}'

@@ -9,5 +9,5 @@ development. It is renamed to `<version>.md` when that version is released.
 
 | Version | Status | Summary |
 | --- | --- | --- |
-| [Next release (0.2.0)](next.md) | Unreleased | Public sharing, signed download tokens, asynchronous recursive deletion, directory downloads as zip |
+| [Next release (0.2.0)](next.md) | Unreleased | Public sharing, signed download tokens, asynchronous recursive deletion, directory downloads as zip, upload queue |
 | [0.1.0](0.1.0.md) | Released | First working file manager with a local filesystem backend |

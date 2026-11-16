@@ -6,8 +6,9 @@ remove a file that still belongs to another (or a re-uploaded) node.
 
 import tempfile
 from datetime import datetime
+from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.utils.timezone import now
 
 from polyfile.apps.accounts.factories import UserFactory
@@ -16,8 +17,8 @@ from polyfile.apps.storage.factories import (
     FsNodeFileFactory,
 )
 from polyfile.apps.storage.handler import fs_storages
-from polyfile.apps.storage.models import FsNode, FsStorage
-from polyfile.apps.storage.upload_service import _build_object_key
+from polyfile.apps.storage.models import FsNode, FsStorage, PendingObjectDeletion
+from polyfile.apps.storage.upload_service import _build_object_key, save_upload
 from polyfile.contrib.backends.file_system_backend.backend import FileSystemBackend
 from polyfile.contrib.backends.utils import get_storage_path
 
@@ -106,3 +107,68 @@ class BuildObjectKeyTests(TestCase):
         node.storage = storage
 
         self.assertEqual(_build_object_key(node), f"{node.pk}-flat.txt")
+
+
+class SaveUploadReplacementTests(TestCase):
+    """A failed replacement must not damage the currently stored file."""
+
+    OLD_KEY = "2026/01/01/old-report.txt"
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.storage = FsStorage.objects.create(
+            name="Local disk",
+            backend=get_storage_path(FileSystemBackend),
+            options={"location": self.temp_dir.name, "upload_to": "%Y/%m/%d"},
+        )
+        fs_storages.clear()
+        self.addCleanup(fs_storages.clear)
+
+        self.user = UserFactory(storage=self.storage)
+        self.node = FsNodeFileFactory(
+            name="report.txt",
+            object_key=self.OLD_KEY,
+            size=3,
+            md5="old-md5",
+            mime_type="text/plain",
+            owner=self.user,
+            storage=self.storage,
+        )
+        self.backend = fs_storages[self.storage.pk]
+
+    def test_failed_save_keeps_the_old_object_and_metadata(self) -> None:
+        request = RequestFactory().post(
+            "/",
+            data=b"replacement content",
+            content_type="application/octet-stream",
+        )
+
+        with patch.object(self.backend, "save", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                save_upload(self.node, request)
+
+        self.node.refresh_from_db()
+        self.assertEqual(self.node.object_key, self.OLD_KEY)
+        self.assertEqual(self.node.size, 3)
+        self.assertEqual(self.node.md5, "old-md5")
+        self.assertEqual(self.node.mime_type, "text/plain")
+        self.assertFalse(PendingObjectDeletion.objects.exists())
+
+    def test_successful_replacement_queues_only_the_old_object(self) -> None:
+        request = RequestFactory().post(
+            "/",
+            data=b"replacement content",
+            content_type="application/octet-stream",
+        )
+
+        save_upload(self.node, request)
+
+        self.node.refresh_from_db()
+        self.assertNotEqual(self.node.object_key, self.OLD_KEY)
+        self.assertEqual(self.node.size, len(b"replacement content"))
+        pending = PendingObjectDeletion.objects.get(
+            storage_id=self.storage.pk,
+        )
+        self.assertEqual(pending.object_key, self.OLD_KEY)
+        self.assertEqual(pending.node_uuid, self.node.pk)

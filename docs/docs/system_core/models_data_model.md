@@ -23,6 +23,11 @@ When deleting nodes, especially directories with subtrees, the system uses a tom
 ### TempUpload
 `TempUpload` is used to handle file uploads securely. When a client initiates creating a file via the API ([API reference](../operations/api_reference.md#initiate-file-upload)), a `TempUpload` token is created tied to the newly created `FsNode` (of type file). The client then uploads the raw file content to the upload endpoint using that token. Once upload completes successfully, the upload is marked complete. This decouples file creation in the tree from the actual file transfer.
 
+A replacement (`replace: true` on touch) reuses the existing `FsNode` and refreshes its `TempUpload` with a new token and the `uploading` status, so the node keeps its UUID and share links. The previous content is queued for deletion only after the new object is stored.
+
+### PendingObjectDeletion
+`PendingObjectDeletion` is a durable outbox for physical objects whose database rows are already gone or no longer referenced. The [deletion worker](recursive_deletion_background_jobs.md) drains it in batches and records failures in `attempts` and `last_error` for retries. Entries are created when recursive deletion removes file nodes and when a replaced file switches to a fresh object key.
+
 ## Tree structure, paths and ancestors
 
 Polyfile stores the tree as an adjacency list (`FsNode.parent` pointing to another `FsNode`, or `null` for roots). Node identity is the UUID primary key; paths are derived, never stored.

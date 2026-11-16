@@ -12,6 +12,9 @@ from polyfile.apps.storage import model_fields
 from polyfile.apps.storage.handler import registered_backends
 from polyfile.apps.storage.storage_objects import StorageObjectRef
 
+if typing.TYPE_CHECKING:
+    from polyfile.apps.share.models import SharedNode
+
 
 def get_backend_choices() -> dict[str, str]:
     return {

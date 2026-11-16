@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import m from "mithril";
 
+vi.mock("../../services/UploadManager", () => ({
+  UploadManager: {
+    enqueueFiles: vi.fn(),
+  },
+}));
+
+import { UploadManager } from "../../services/UploadManager";
 import { DashboardFsNodeList } from "../../services/DashboardFsNodeList";
 import { uploadFile } from "../uploader";
 
@@ -9,70 +15,49 @@ const PARENT_ID = "11111111-1111-1111-1111-111111111111";
 const createEvent = (fileNames) => ({
   target: {
     files: fileNames.map((name) => ({ name })),
+    value: "selected-file",
   },
 });
 
 describe("uploader.uploadFile()", () => {
   beforeEach(() => {
-    DashboardFsNodeList.current = null;
-    DashboardFsNodeList.elements = [];
+    DashboardFsNodeList.current = { id: PARENT_ID };
+    vi.mocked(UploadManager.enqueueFiles).mockClear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("creates the node by parent id and file name, then uploads the content", async () => {
-    const request = vi.spyOn(m, "request").mockImplementation((url, options) => {
-      if (url === "/api/v1/fs-node/touch") {
-        return Promise.resolve({
-          id: "22222222-2222-2222-2222-222222222222",
-          name: options.body.name,
-          type: "file",
-          upload_url: "/upload/some-token",
-        });
-      }
-      return Promise.resolve({});
-    });
-    DashboardFsNodeList.current = { id: PARENT_ID };
+  it("hands the selected files to the upload queue with the current parent", () => {
+    const event = createEvent(["report.pdf"]);
 
-    uploadFile(createEvent(["report.pdf"]));
-    await vi.waitFor(() => {
-      expect(request).toHaveBeenCalledTimes(2);
-    });
+    uploadFile(event);
 
-    expect(request).toHaveBeenNthCalledWith(1, "/api/v1/fs-node/touch", {
-      method: "POST",
-      body: { parent_id: PARENT_ID, name: "report.pdf" },
-    });
-    expect(request).toHaveBeenNthCalledWith(2, "/upload/some-token", expect.objectContaining({
-      method: "POST",
-    }));
-    expect(DashboardFsNodeList.elements).toHaveLength(1);
+    expect(UploadManager.enqueueFiles).toHaveBeenCalledWith(
+      [{ name: "report.pdf" }],
+      PARENT_ID,
+    );
+    expect(event.target.value).toBe("");
   });
 
-  it("creates the node in the virtual root when there is no current id", async () => {
-    const request = vi.spyOn(m, "request").mockImplementation((url, options) => {
-      if (url === "/api/v1/fs-node/touch") {
-        return Promise.resolve({
-          id: "22222222-2222-2222-2222-222222222222",
-          name: options.body.name,
-          type: "file",
-          upload_url: "/upload/some-token",
-        });
-      }
-      return Promise.resolve({});
-    });
-    DashboardFsNodeList.current = { id: null };
+  it("captures the virtual root when there is no current node", () => {
+    DashboardFsNodeList.current = null;
+    const event = createEvent(["report.pdf"]);
 
-    uploadFile(createEvent(["report.pdf"]));
-    await vi.waitFor(() => {
-      expect(request).toHaveBeenCalledTimes(2);
-    });
+    uploadFile(event);
 
-    expect(request).toHaveBeenNthCalledWith(1, "/api/v1/fs-node/touch", {
-      method: "POST",
-      body: { parent_id: null, name: "report.pdf" },
-    });
+    expect(UploadManager.enqueueFiles).toHaveBeenCalledWith(
+      [{ name: "report.pdf" }],
+      null,
+    );
+  });
+
+  it("does nothing when the input has no files", () => {
+    const event = createEvent([]);
+
+    uploadFile(event);
+
+    expect(UploadManager.enqueueFiles).not.toHaveBeenCalled();
   });
 });

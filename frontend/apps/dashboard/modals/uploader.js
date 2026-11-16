@@ -1,45 +1,26 @@
-import {DashboardFsNode} from "../models/DashboardFsNode";
-import {DashboardFsNodeList} from "../services/DashboardFsNodeList";
-import { API_V1_FSNODE_TOUCH } from "../constants/endpoints";
-import m from "mithril";
+import { DashboardFsNodeList } from "../services/DashboardFsNodeList";
+import { UploadManager } from "../services/UploadManager";
 
+/**
+ * Hand the selected files to the upload queue.
+ *
+ * The target directory is captured at selection time so a later navigation
+ * cannot move an in-flight upload to another folder.
+ *
+ * @param {Event} event - Change event from a file input.
+ * @returns {void}
+ */
+const uploadFile = (event) => {
+  const files = Array.from(event?.target?.files || []);
+  if (files.length === 0) {
+    return;
+  }
 
-// TODO: do we need selection of uploaded nodes? I think no.
-//  Maybe we should show them as "new files"
-const uploadFile = (e) => (
-  Array.from(e.target.files).map((file) => (
-    // Create FsNode
-    m.request(API_V1_FSNODE_TOUCH, {
-      method: "POST",
-      body: {
-        parent_id: DashboardFsNodeList.current?.id || null,
-        name: file.name,
-      },
-    })
-    .then((data) => {
-      // Update FsNodeList
-      const fsNode = new DashboardFsNode({...data, upload_status: "uploading"});
-      DashboardFsNodeList.addFsNode(fsNode);
-      DashboardFsNodeList.selectFsNode(fsNode);
+  const parentId = DashboardFsNodeList.current?.id ?? null;
+  UploadManager.enqueueFiles(files, parentId);
 
-      // Upload file content
-      m.request(data.upload_url, {
-        method: "POST",
-        // Send binary data
-        body: file,
-        // Bypasses default JSON.stringify
-        serialize: (value) => value,
-      }).then((uploadData) => {
-        Object.assign(fsNode, uploadData);
-        fsNode.upload_status = "done";
-      });
-      return data;
-    })
-    .catch((error) => {
-      // TODO: error handling
-      console.log('err', error);
-    })
-  ))
-)
+  // Allow selecting the same file again after a conflict or cancellation.
+  event.target.value = "";
+};
 
 export { uploadFile };

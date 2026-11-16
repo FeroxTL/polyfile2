@@ -11,8 +11,8 @@ const FsNodeBcLink = {
     const linkAttrs = { href: getPublicUrl(path) };
 
     if (node?.id && onNavigate) {
-      // Preload the target by UUID; m.route.Link still performs the
-      // path-based navigation and keeps modifier clicks working.
+      /* Preload the target by UUID; m.route.Link still performs the
+      path-based navigation and keeps modifier clicks working. */
       linkAttrs.onclick = () => onNavigate(node, path);
     }
 

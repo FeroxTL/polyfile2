@@ -32,6 +32,7 @@ def catch_storage_exceptions(func: Callable):
                 'error_id': e.error_code,
                 'description': e.description,
                 'message': e.detail,
+                **e.extra,
             }))
         except Http404 as e:
             if request is not None and wants_html(request):

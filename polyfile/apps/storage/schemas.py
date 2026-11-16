@@ -3,10 +3,12 @@ from pathlib import PurePosixPath
 
 import marshmallow.types
 from django.core.exceptions import ObjectDoesNotExist
+from django.http.request import HttpRequest
 from django.urls import reverse
 from marshmallow import Schema, fields, validate
 from marshmallow.experimental.context import Context
 
+from polyfile.apps.share.models import SharedNode
 from polyfile.apps.share.utils import get_public_share_url
 from polyfile.apps.storage.models import FsNode
 
@@ -99,14 +101,16 @@ class FsNodeItemSchema(Schema):
             return reverse("download_file", kwargs={"pk": obj.pk})
         return ""
 
-    def get_share(self, obj: FsNode) -> dict[str, str | None] | None:
+    @staticmethod
+    def get_share(obj: FsNode) -> dict[str, str | None] | None:
         """Return public share info for an active share, if any."""
         request = ShareUrlRequestContext.get(None)
         if request is None or not obj.pk:
             return None
+        assert isinstance(request, HttpRequest)
 
         try:
-            share = obj.share
+            share: SharedNode = obj.share
         except ObjectDoesNotExist:
             return None
 
@@ -178,3 +182,8 @@ class FsNodeCreateByNameRequestSchema(Schema):
     """FsNode create params (UUID identity): parent UUID + name."""
     parent_id = fields.UUID(required=False, allow_none=True, load_default=None)
     name = fields.Str(required=True, validate=get_fs_node_name_validator())
+
+
+class FsNodeTouchRequestSchema(FsNodeCreateByNameRequestSchema):
+    """File upload session params: create or replace an existing file node."""
+    replace = fields.Bool(load_default=False)
