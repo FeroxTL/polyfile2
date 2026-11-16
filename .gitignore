@@ -19,7 +19,7 @@ local
 .codex
 coverage/
 .playwright-mcp/
-.vitest-secret-token
+vitest
 npm-cache
 unsloth-*
 
