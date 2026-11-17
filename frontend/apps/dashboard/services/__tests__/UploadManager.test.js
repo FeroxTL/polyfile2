@@ -218,7 +218,7 @@ describe("UploadManager", () => {
     expect(DashboardFsNodeList.elements).toHaveLength(0);
     expect(request).toHaveBeenCalledWith(
       `/api/v1/fs-node/${NODE_ID}/`,
-      { method: "DELETE" },
+      { method: "DELETE", params: { permanent: "true" } },
     );
   });
 
@@ -246,7 +246,7 @@ describe("UploadManager", () => {
     await vi.waitFor(() => {
       expect(request).toHaveBeenCalledWith(
         `/api/v1/fs-node/${NODE_ID}/`,
-        { method: "DELETE" },
+        { method: "DELETE", params: { permanent: "true" } },
       );
     });
 

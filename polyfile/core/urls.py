@@ -37,6 +37,7 @@ public_page_patterns = [
     ),
     path("files<path:path>", fs_node_browse_view, name="fs_node_browse"),
     path("shares", fs_node_browse_view, name="shares_dashboard"),
+    path("trash", fs_node_browse_view, name="trash_dashboard"),
 ]
 
 urlpatterns: list[URLPattern | URLResolver] = [

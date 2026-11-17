@@ -15,9 +15,9 @@ import { sendRemoveFsNodesRequest } from "../remove_fsnode_modal";
 const NODE_A = "11111111-1111-1111-1111-111111111111";
 const NODE_B = "22222222-2222-2222-2222-222222222222";
 
-const createVnode = (removeList) => ({
+const createVnode = (removeList, permanent = false) => ({
   attrs: { modalId: ["modal"] },
-  state: { removeList, error: null },
+  state: { removeList, error: null, permanent },
 });
 
 describe("sendRemoveFsNodesRequest()", () => {
@@ -75,5 +75,26 @@ describe("sendRemoveFsNodesRequest()", () => {
 
     expect(vnode.state.error).toBe(error);
     expect(closeModal).not.toHaveBeenCalled();
+  });
+
+  it("moves nodes to the Trash by default", async () => {
+    const request = vi.spyOn(m, "request").mockResolvedValue({});
+    const vnode = createVnode([new DashboardFsNode({ id: NODE_A, name: "a.txt" })]);
+
+    await sendRemoveFsNodesRequest(vnode);
+
+    expect(request).toHaveBeenCalledWith(`/api/v1/fs-node/${NODE_A}/`, { method: "DELETE" });
+  });
+
+  it("deletes permanently when the bypass flag is set", async () => {
+    const request = vi.spyOn(m, "request").mockResolvedValue({});
+    const vnode = createVnode([new DashboardFsNode({ id: NODE_A, name: "a.txt" })], true);
+
+    await sendRemoveFsNodesRequest(vnode);
+
+    expect(request).toHaveBeenCalledWith(`/api/v1/fs-node/${NODE_A}/`, {
+      method: "DELETE",
+      params: { permanent: "true" },
+    });
   });
 });

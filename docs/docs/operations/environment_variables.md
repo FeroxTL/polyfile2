@@ -41,6 +41,12 @@ Directory downloads are built asynchronously into a ZIP archive. Archives are st
 | `DIRECTORY_ARCHIVE_MAX_SIZE`    | `str`  | `10GB`                         | Maximum total source size in one directory archive (`512MB`, `10GB`). Units are binary (`1KB` = 1024B). |
 | `DIRECTORY_ARCHIVE_RETRY_AFTER` | `int`  | `2`                            | `Retry-After`/polling interval in seconds while an archive is being built. |
 
+## Trash
+
+| Variable                | Type  | Default | Description                                                                          |
+|-------------------------|-------|---------|--------------------------------------------------------------------------------------|
+| `POLYFILE_TRASH_TTL_DAYS` | `int` | `30`    | How many days a trash entry is kept before it is purged. `0` or negative disables automatic purging. |
+
 ## Debug Toolbar
 
 | Variable                | Type   | Default                                      | Description                                                                                                                   |

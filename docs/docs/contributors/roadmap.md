@@ -17,6 +17,7 @@ This is the committed scope for the next release. Items move to the
 | --- | --- | --- |
 | Authentication | Password reset | Planned |
 | Authentication | Temporary IP ban after repeated failed logins | Done |
+| File management | Trash bin with scheduled cleanup | Done |
 
 ## Later
 
@@ -29,7 +30,6 @@ Accepted work that is not scheduled for a specific release yet.
 - Storage migration between backends
 
 ### File management
-- Trash bin with scheduled cleanup
 - Space limits per user, storage and group, with usage display
 - Access tokens with CRUD and per-node permissions
 - Sharing between users

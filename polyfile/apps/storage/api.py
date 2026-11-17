@@ -1,3 +1,4 @@
+import json
 import uuid
 
 import marshmallow
@@ -6,8 +7,14 @@ from django.urls import reverse
 from django_hint import RequestType
 
 from polyfile.apps.accounts.models import User
-from polyfile.apps.storage import schemas
+from polyfile.apps.storage import schemas, trash_service
 from polyfile.apps.storage.models import FsNode, FsNodeDeletionJob, TempUpload
+from polyfile.apps.storage.trash_service import (
+    empty_trash,
+    purge_trash_entry,
+    restore_fs_node,
+    trash_fs_node,
+)
 from polyfile.apps.storage.utils import (
     create_fs_node,
     get_fs_node_with_children,
@@ -44,16 +51,23 @@ class FsNodeListApiView(BaseApiView):
 
     @staticmethod
     def delete(request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:
-        """Remove FsNode by its UUID."""
+        """Move FsNode to the trash by default; permanently with ``?permanent=true``."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
         if node_id is None:
             raise exceptions.BadRequest("node_id is required")
 
-        job = remove_fs_node(user=request.user, node_id=node_id)
+        if request.GET.get("permanent", "").lower() in ("true", "1", "yes"):
+            job = remove_fs_node(user=request.user, node_id=node_id)
+            return http.JsonResponse(
+                data={"job_id": str(job.pk), "status": job.status},
+                status=202,
+            )
+
+        fs_node = trash_fs_node(user=request.user, node_id=node_id)
         return http.JsonResponse(
-            data={"job_id": str(job.pk), "status": job.status},
-            status=202,
+            data=schemas.TrashEntrySchema().dump(fs_node),
+            status=200,
         )
 
 
@@ -65,6 +79,7 @@ class FsNodeDeletionJobStatusApiView(BaseApiView):
             job = FsNodeDeletionJob.objects.get(pk=job_id, owner=request.user)
         except FsNodeDeletionJob.DoesNotExist:
             raise exceptions.NotFound("Deletion job not found")
+
         return http.JsonResponse(
             data={
                 "job_id": str(job.pk),
@@ -136,3 +151,67 @@ class FsNodeTouchApiView(FsNodeCreateApiView):
             **schemas.FsNodeItemSchema().dump(fs_node),
             "upload_url": reverse("upload_file", kwargs={"token": temp_upload.token}),
         })
+
+
+class TrashListApiView(BaseApiView):
+    @staticmethod
+    def get(request: RequestType) -> http.HttpResponse:
+        """List the user's visible trash entries, newest first."""
+        assert request.user.is_authenticated and isinstance(request.user, User)
+
+        data = schemas.TrashListResponseSchema().dump({
+            "entries": trash_service.get_trash_roots(request.user),
+        })
+        return http.JsonResponse(data=data)
+
+
+class TrashEntryApiView(BaseApiView):
+    @staticmethod
+    def delete(request: RequestType, entry_id: uuid.UUID) -> http.HttpResponse:
+        """Permanently remove a trash entry (nested entries stay in the trash)."""
+        assert request.user.is_authenticated and isinstance(request.user, User)
+
+        job = purge_trash_entry(user=request.user, entry_id=entry_id)
+        return http.JsonResponse(
+            data={"job_id": str(job.pk), "status": job.status},
+            status=202,
+        )
+
+
+class TrashEntryRestoreApiView(BaseApiView):
+    serializer_class = schemas.TrashRestoreRequestSchema
+
+    @classmethod
+    def post(cls, request: RequestType, entry_id: uuid.UUID) -> http.HttpResponse:
+        """Restore a trash entry to its original location."""
+        assert request.user.is_authenticated and isinstance(request.user, User)
+
+        try:
+            params = cls.load_params(request)
+        except marshmallow.ValidationError as e:
+            raise exceptions.FieldValidationError(detail=e.messages)
+
+        result = restore_fs_node(
+            user=request.user,
+            entry_id=entry_id,
+            on_conflict=params["on_conflict"],
+        )
+        data = schemas.TrashRestoreResponseSchema().dump({
+            "node": result.node,
+            "restored_entries": result.restored_entries,
+            "notices": result.notices,
+        })
+        return http.JsonResponse(data=data)
+
+
+class TrashEmptyApiView(BaseApiView):
+    @staticmethod
+    def post(request: RequestType) -> http.HttpResponse:
+        """Purge every visible trash entry of the user."""
+        assert request.user.is_authenticated and isinstance(request.user, User)
+
+        jobs = empty_trash(user=request.user)
+        return http.JsonResponse(
+            data={"job_ids": [str(job.pk) for job in jobs]},
+            status=202,
+        )

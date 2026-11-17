@@ -26,8 +26,16 @@ class StorageAdmin(admin.ModelAdmin):
 @admin.register(FsNode)
 class FsNodeAdmin(admin.ModelAdmin):
     ordering = ("name",)
-    list_display = ("id", "type", "name", "file_display", "display_is_deleted")
-    list_filter = ("storage", "type", "deleted_at")
+    list_display = (
+        "id",
+        "type",
+        "name",
+        "file_display",
+        "display_is_deleted",
+        "display_is_trashed",
+        "display_is_trash_retained",
+    )
+    list_filter = ("storage", "type", "deleted_at", "trashed_at", "trash_retained_at")
     raw_id_fields = ("storage", "owner", "parent")
     readonly_fields = (
         "size",
@@ -53,6 +61,14 @@ class FsNodeAdmin(admin.ModelAdmin):
     @admin.display(description=_("Deleted"), boolean=True)
     def display_is_deleted(self, obj: FsNode | None) -> bool:
         return obj is not None and obj.deleted_at is not None
+
+    @admin.display(description=_("Trashed"), boolean=True)
+    def display_is_trashed(self, obj: FsNode | None) -> bool:
+        return obj is not None and obj.trashed_at is not None
+
+    @admin.display(description=_("Trash retained"), boolean=True)
+    def display_is_trash_retained(self, obj: FsNode | None) -> bool:
+        return obj is not None and obj.trash_retained_at is not None
 
     def get_readonly_fields(self, request: HttpRequest, obj: FsNode | None = None) -> tuple:
         if obj is None:

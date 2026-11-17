@@ -109,9 +109,22 @@ See [Storage backends](../system_core/storage_backends.md#upload-flow) for uploa
 ### Delete node
 `DELETE /api/v1/fs-node/<uuid:node_id>/`
 
-**Behavior:** Marks the node's subtree for deletion and creates a [FsNodeDeletionJob](../system_core/models_data_model.md#fsnodedeletionjob). Returns `202 Accepted` immediately (asynchronous deletion). Foreign, deleted or unknown UUIDs return 404.
+**Behavior:** By default the node (and its subtree) is **moved to the Trash**: it disappears from the file manager, appears in `/trash`, and stays restorable for `POLYFILE_TRASH_TTL_DAYS` (default 30). The operation is synchronous and returns `200` with the trashed entry. Foreign, deleted or unknown UUIDs return 404.
 
-**Response:**
+Add `?permanent=true` to delete immediately: the node's subtree is marked for deletion and a [FsNodeDeletionJob](../system_core/models_data_model.md#fsnodedeletionjob) is created; the response is `202 Accepted` (asynchronous deletion). Nodes already in the Trash are not touched — their ancestor directories become retained scaffolding, see [Trash](#trash).
+
+**Response (trash):**
+```json
+{
+  "id": "<uuid>",
+  "name": "report.pdf",
+  "type": "file",
+  "trashed_at": "2026-01-01T12:00:00Z",
+  "trash_purge_after": "2026-01-31T12:00:00Z"
+}
+```
+
+**Response (`?permanent=true`):**
 ```json
 {
   "job_id": "<uuid>",
@@ -120,6 +133,43 @@ See [Storage backends](../system_core/storage_backends.md#upload-flow) for uploa
 ```
 
 Details in [Recursive deletion/background jobs](../system_core/recursive_deletion_background_jobs.md).
+
+### Trash
+`GET /api/v1/trash/`
+
+**Behavior:** Lists the objects the user deleted, newest first. Only trash entry roots are returned: the contents of a deleted directory are not listed. Each item carries only `id`, `name`, `type`, `trashed_at` and `trash_purge_after`.
+
+**Response:**
+```json
+{
+  "entries": [
+    {"id": "...", "name": "report.pdf", "type": "file", "trashed_at": "...", "trash_purge_after": "..."}
+  ]
+}
+```
+
+`POST /api/v1/trash/<uuid:entry_id>/restore`
+
+**Behavior:** Restores an entry to its original path. The path is read from the database, so a renamed ancestor is respected. If an active ancestor directory with the same name appeared meanwhile, the retained directory is merged into it; if the sibling is a file, the restored directory is renamed `name (N)`. Trashed ancestors are restored implicitly (chain restore).
+
+**Body:** `{"on_conflict": "fail" | "rename"}` (default `fail`). `fail` answers `409` with `existing_node_id`/`existing_type` when a same-name active sibling exists; `rename` restores as `name (N)`.
+
+**Response:**
+```json
+{
+  "node": {"id": "...", "name": "...", "...": "..."},
+  "restored_entries": [{"id": "...", "name": "parent-dir", "type": "directory"}],
+  "notices": [{"type": "merged", "name": "docs"}]
+}
+```
+
+`DELETE /api/v1/trash/<uuid:entry_id>/`
+
+**Behavior:** Permanently deletes the entry's own batch. Nested trash entries **survive and stay visible**; their ancestor directories (including the deleted entry root) become invisible retained scaffolding until those entries are restored or purged. Returns `202` with a job id.
+
+`POST /api/v1/trash/empty`
+
+**Behavior:** Permanently deletes every visible trash entry of the user (one job per entry). Returns `202` with `job_ids`. Nested entries are protected by the same rule as above.
 
 ### Deletion job status
 `GET /api/v1/fs-node/deletion-jobs/<uuid:job_id>/`

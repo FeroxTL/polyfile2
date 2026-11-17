@@ -33,10 +33,41 @@ Polyfile is a system for managing and sharing files using a signed token mechani
 ## Recursive Directory Deletion
 The system supports asynchronous recursive directory deletion.
 - **Mechanism**: Uses `FsNodeDeletionJob` to manage background deletion tasks. Jobs identify the subtree root by `root_node_uuid` + `root_node_name`. `FsNode` entities include `deleted_at` (timestamp) and `deletion_job` (foreign key) fields.
-- **API Behavior**: `DELETE /api/v1/fs-node/<uuid:node_id>/` returns `202 Accepted` immediately. Nodes are marked as deleted in a transaction; physical removal happens in the background.
+- **API Behavior**: `DELETE /api/v1/fs-node/<uuid:node_id>/?permanent=true` returns `202 Accepted` immediately (without the flag the node goes to the trash, see below). Nodes are marked as deleted in a transaction; physical removal happens in the background.
 - **Background Worker**: A management command `run_deletion_worker` processes deletions in batches using a leaf-first strategy (files before directories).
 - **Storage Backends**: `FsBackendBase` includes a `delete_many` method to support efficient bulk deletions.
 - **Constraints**: Implements partial unique constraints on `FsNode` to allow "tombstones" (deleted nodes) while preserving uniqueness for active nodes.
+- **Single marking algorithm**: `utils.mark_subtree_for_deletion(user, root, deletion_mode)` is shared by permanent deletion (`permanent`) and trash purging (`purge`). It partitions the subtree into *doomed* (tombstoned), *protected* (trash entries of foreign batches, retained scaffolding, mid-purge rows) and *retained ancestors* of protected nodes.
+
+## Trash (recycle bin)
+Trash state lives on `FsNode`: `trashed_at`, `trash_batch_id`, `trash_purge_after`, `trash_retained_at`. `FsNode` has three visible states plus a tombstone:
+- **active** (all NULL) — visible in the file manager.
+- **trashed** (`trashed_at`) — visible only in the trash; the subtree of one DELETE shares one `trash_batch_id`.
+- **retained scaffolding** (`trash_retained_at`) — directories kept only as a path to trashed descendants; invisible everywhere.
+
+**Managers:** `FsNode.active` (all three NULL), `FsNode.trash` (trashed and still restorable), `FsNode.objects` (everything). The partial unique constraints require all three timestamps to be NULL, so a trashed or retained node never blocks a same-name active sibling.
+
+**Invariants:** an active node has only active ancestors; a trash entry root is a trashed node whose parent is not trashed by the same batch; a retained subtree contains only trashed/retained/tombstoned nodes.
+
+**Lifecycle** (`apps/storage/trash_service.py`):
+- `trash_fs_node`: marks the active subtree with a fresh batch (nested entries keep their own batch/TTL), revokes shares, cancels `TempUpload`s and releases archive manifests. Synchronous (`200`).
+- `restore_fs_node(user, entry_id, on_conflict)`: the node never leaves the tree, so it returns to the exact path stored in the DB. Retained ancestors are un-hidden on the way; a same-name active directory is **merged** into (children re-parented, scaffolding row deleted), a same-name file forces a rename `name (N)`. Trashed ancestors are restored implicitly (chain restore) and reported in `restored_entries`; side effects are reported in `notices`.
+- `purge_trash_entry` / `empty_trash`: purge the entry's own batch only. Nested trash entries survive and stay visible; their ancestors (including the entry root) become retained scaffolding. The same applies to the TTL sweep.
+- `enqueue_expired_trash_purges`: creates deletion jobs for entries past `trash_purge_after`.
+- `reap_trash_scaffolding`: deletes retained directories that no longer have children (bottom-up, repeated passes).
+
+**API** (owner-scoped, 404 for foreign entries):
+| Method | Path | Response |
+|---|---|---|
+| `DELETE` | `/api/v1/fs-node/<uuid>/` | `200` trash entry; `?permanent=true` → `202 {job_id}` |
+| `GET` | `/api/v1/trash/` | `200 {"entries": [{id, name, type, trashed_at, trash_purge_after}]}`, newest first |
+| `POST` | `/api/v1/trash/<uuid>/restore` | `200 {node, restored_entries, notices}`; `409 FsNodeExistsError` with `existing_node_id` |
+| `DELETE` | `/api/v1/trash/<uuid>/` | `202 {job_id, status}` |
+| `POST` | `/api/v1/trash/empty` | `202 {job_ids}` |
+
+**TTL:** `POLYFILE_TRASH_TTL_DAYS` (env, default 30) is denormalized into `trash_purge_after` at trash time, so changing the setting does not affect existing entries. Sweeps run inside `run_deletion_worker` (`--trash-sweep-interval`, 0 disables) and via the `purge_expired_trash` command; both only *create* jobs — physical removal stays with the deletion worker.
+
+**Frontend:** `/trash` route (`TrashDashboardView`) shows only the objects the user actually deleted (name, icon, date; nested content is not browsable); selection swaps the header for "Restore / Delete permanently", without selection it shows "Empty trash". `restore_monitor_modal.js` mirrors the upload monitor: per-entry states, a "Keep both / Skip" question on `409`, and a summary of implicit restores and notices. The remove dialog has a "Delete permanently, bypassing the Trash" checkbox; cancelled uploads always delete permanently.
 
 ## FsNode identity (UUID migration, done)
 - `FsNode.id` (UUID) is the canonical identifier for all mutations: create (`parent_id` + `name`), delete (`DELETE .../<uuid>/`), share (`POST /api/shares/` with `node_id`).

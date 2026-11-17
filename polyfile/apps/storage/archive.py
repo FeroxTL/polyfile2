@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils.timezone import now
 from django_cte import CTE, with_cte
 
@@ -48,13 +49,22 @@ class ManifestEntry:
 
 
 def _load_subtree(root: FsNode) -> list[dict]:
-    """Load the active subtree of ``root`` in a single recursive CTE."""
+    """Load the active subtree of ``root`` in a single recursive CTE.
+
+    Trashed nodes (recycle bin) and retained scaffolding are excluded: they
+    are invisible in the file manager and must not leak into an archive.
+    """
+    active_children = Q(
+        deleted_at__isnull=True,
+        trashed_at__isnull=True,
+        trash_retained_at__isnull=True,
+    )
     cte = CTE.recursive(
         lambda cte: FsNode.active.filter(pk=root.pk)
         .values("pk")
         .union(
             cte.join(FsNode, parent_id=cte.col.pk)
-            .filter(deleted_at__isnull=True)
+            .filter(active_children)
             .values("pk"),
             all=True,
         )
@@ -63,7 +73,7 @@ def _load_subtree(root: FsNode) -> list[dict]:
         with_cte(
             cte,
             select=cte.join(FsNode, pk=cte.col.pk)
-            .filter(deleted_at__isnull=True)
+            .filter(active_children)
             .values(
                 "pk",
                 "parent_id",

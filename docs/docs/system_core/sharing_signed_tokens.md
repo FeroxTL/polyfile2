@@ -7,7 +7,7 @@ Polyfile allows sharing files/directories publicly via `SharedNode`. The sharing
 ## How sharing works
 
 ### SharedNode
-A `SharedNode` represents a public share rooted at a [FsNode](models_data_model.md#fsnode). When created, it points to the root node of the shared subtree and defines its lifecycle - shares can be time-limited with `expires_at` and can be manually revoked with `revoked_at`. A share is only valid if it hasn't been revoked, hasn't expired, and its root node hasn't been deleted. The `active` manager enforces these rules automatically.
+A `SharedNode` represents a public share rooted at a [FsNode](models_data_model.md#fsnode). When created, it points to the root node of the shared subtree and defines its lifecycle - shares can be time-limited with `expires_at` and can be manually revoked with `revoked_at`. A share is only valid if it hasn't been revoked, hasn't expired, and its root node hasn't been deleted or trashed. The `active` manager enforces these rules automatically.
 
 ### ShareDownload
 Every download through a share creates a `ShareDownload` record logging access details (IP address, user agent, timestamp). This provides an audit trail and forms the basis for future download limits and statistics.

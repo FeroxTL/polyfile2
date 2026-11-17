@@ -73,7 +73,9 @@ class GetShareDetailApiView(AnonymousApiView):
     def get(self, request: http.HttpRequest, share_token: str, path: str = "") -> http.HttpResponse:
         """Retrieve the details of a public share."""
         try:
-            share = SharedNode.active.get(token=share_token, root_fs_node__deleted_at__isnull=True)
+            # `active` excludes revoked/expired shares and roots that are deleted,
+            # trashed or retained as trash scaffolding.
+            share = SharedNode.active.get(token=share_token)
             node_path: PurePosixPath = ensure_absolute_path(path)
             fs_node_with_children = get_fs_node_with_children(
                 user=share.owner, 
@@ -130,10 +132,17 @@ def public_share_download(
         })
 
     try:
-        # Find an active ShareNode
-        share = SharedNode.active.get(token=share_token)
+        # Find an active ShareNode. Both managers already exclude deleted,
+        # trashed and retained nodes; the explicit checks keep the download
+        # path safe if a manager filter is ever relaxed.
+        share = SharedNode.active.select_related("root_fs_node").get(token=share_token)
         node = FsNode.active.get(id=fs_node_id)
-        if node.deleted_at is not None or share.root_fs_node.deleted_at is not None:
+        if (
+            node.trashed_at is not None
+            or node.trash_retained_at is not None
+            or share.root_fs_node.trashed_at is not None
+            or share.root_fs_node.trash_retained_at is not None
+        ):
             raise FsNode.DoesNotExist
     except (FsNode.DoesNotExist, SharedNode.DoesNotExist):
         return render(request, "share/error.html", status=404, context={

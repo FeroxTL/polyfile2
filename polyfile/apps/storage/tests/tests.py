@@ -43,9 +43,11 @@ class RecursiveDeletionTests(TestCase):
         self.assertEqual(job.root_node_name, "sub")
         self.assertEqual(job.total_nodes, 2)
 
-    def test_delete_api_returns_202(self) -> None:
+    def test_delete_api_with_permanent_flag_returns_202(self) -> None:
         self.client.force_login(self.user)
-        resp = self.client.delete(reverse("fs_node_by_id", kwargs={"node_id": self.root.pk}))
+        resp = self.client.delete(
+            reverse("fs_node_by_id", kwargs={"node_id": self.root.pk}) + "?permanent=true"
+        )
         self.assertEqual(resp.status_code, 202)
         data = resp.json()
         self.assertIn("job_id", data)

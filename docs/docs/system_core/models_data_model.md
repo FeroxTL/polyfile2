@@ -17,6 +17,16 @@ Polyfile's data model is built around representing a user file tree that can spa
 ### Deletion model
 When deleting nodes, especially directories with subtrees, the system uses a tombstone approach. Nodes are marked as deleted (`deleted_at`) and assigned to a [FsNodeDeletionJob](#fsnodedeletionjob). Physical removal from backends and final cleanup from the database is handled asynchronously by the deletion worker - see [Recursive deletion/background jobs](recursive_deletion_background_jobs.md) for full details.
 
+### Trash
+Before a node is tombstoned it usually goes through the Trash. `FsNode` carries four trash fields:
+
+- `trashed_at` - when the node was moved to the trash;
+- `trash_batch_id` - the delete operation; a subtree deleted in one request shares one batch, and restoring an entry restores exactly that batch;
+- `trash_purge_after` - the denormalized TTL (`POLYFILE_TRASH_TTL_DAYS`, default 30 days);
+- `trash_retained_at` - the node is a directory kept only as the *path* to trashed descendants. Retained nodes are invisible both in the file manager and in the trash.
+
+Three managers reflect the states: `FsNode.active` (visible nodes), `FsNode.trash` (restorable entries) and `FsNode.objects` (everything). The partial unique constraints require `deleted_at`, `trashed_at` and `trash_retained_at` to be `NULL`, so a trashed or retained node never blocks a same-name active sibling. Paths are never stored twice: because a trashed node stays attached to its parent, restoring it returns it to the exact path held in the tree.
+
 ### FsNodeDeletionJob
 `FsNodeDeletionJob` tracks asynchronous deletion of a subtree. It maintains status (e.g., pending/running/done/failed/timeout/cancelled), progress counters, locking information for the worker, and error details. For detailed behavior, states, and the worker algorithm, refer to [Recursive deletion/background jobs](recursive_deletion_background_jobs.md).
 

@@ -97,8 +97,10 @@ const deleteNode = async (node) => {
   }
 
   try {
+    // Placeholder nodes of cancelled uploads must not pollute the Trash.
     await m.request(m.buildPathname(API_V1_FSNODE_BY_ID, { id: node.id }), {
       method: "DELETE",
+      params: { permanent: "true" },
     });
   } catch {
     // The node is already hidden locally.

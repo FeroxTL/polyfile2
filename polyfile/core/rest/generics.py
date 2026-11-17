@@ -43,32 +43,10 @@ class AnonymousApiView(View):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class BaseApiView(LoginRequiredMixin, AnonymousApiView):
-    """Base view for all api views."""
-
-    @staticmethod
-    def json_response(data: dict, status: int = 200) -> http.JsonResponse:
-        """Build a JSON response with an explicit Content-Type."""
-        return http.JsonResponse(data, status=status)
-
-    def handle_no_permission(self) -> http.HttpResponseRedirect | http.JsonResponse:
-        if wants_html(self.request):
-            return http.HttpResponseRedirect(settings.LOGIN_URL)
-
-        return http.JsonResponse({
-            "error_id": Unauthorized.error_code,
-            "description": Unauthorized.description,
-            "detail": Unauthorized.description,
-        }, status=Unauthorized.status_code)
-
-
-class CreateApiView(BaseApiView):
-    """Base view for endpoints that create a resource from a JSON body.
+    """Base view for all api views.
 
     Subclasses set ``serializer_class`` (a Marshmallow schema used for the
-    request body) and implement :meth:`create`, which returns the
-    JSON-serializable response payload. ``POST`` is handled by default and
-    wraps :meth:`create` into :meth:`BaseApiView.json_response`.
-    """
+    request body)."""
 
     serializer_class: type[Schema]
 
@@ -89,6 +67,30 @@ class CreateApiView(BaseApiView):
             return cls.serializer_class().load(body)
         except ValidationError as e:
             raise FieldValidationError(detail=e.messages)
+
+    @staticmethod
+    def json_response(data: dict, status: int = 200) -> http.JsonResponse:
+        """Build a JSON response with an explicit Content-Type."""
+        return http.JsonResponse(data, status=status)
+
+    def handle_no_permission(self) -> http.HttpResponseRedirect | http.JsonResponse:
+        if wants_html(self.request):
+            return http.HttpResponseRedirect(settings.LOGIN_URL)
+
+        return http.JsonResponse({
+            "error_id": Unauthorized.error_code,
+            "description": Unauthorized.description,
+            "detail": Unauthorized.description,
+        }, status=Unauthorized.status_code)
+
+
+class CreateApiView(BaseApiView):
+    """Base view for endpoints that create a resource from a JSON body.
+
+    Subclasses implement :meth:`create`, which returns the
+    JSON-serializable response payload. ``POST`` is handled by default and
+    wraps :meth:`create` into :meth:`BaseApiView.json_response`.
+    """
 
     @classmethod
     def create(cls, request: RequestType) -> dict:

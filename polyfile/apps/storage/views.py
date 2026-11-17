@@ -2,13 +2,13 @@ import uuid
 
 from django.contrib.auth.decorators import login_not_required, login_required
 from django.http import (
-    HttpRequest,
     HttpResponseRedirect,
     response,
 )
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
+from django_hint import RequestType
 
 from polyfile.apps.storage import (
     archive,
@@ -23,7 +23,7 @@ from polyfile.core import exceptions
 from polyfile.core.exceptions import NotFound
 
 
-def _archive_error_response(request: HttpRequest, exc: exceptions.HttpException):
+def _archive_error_response(request: RequestType, exc: exceptions.HttpException):
     return render(
         request,
         "storage/archive_error.html",
@@ -34,7 +34,7 @@ def _archive_error_response(request: HttpRequest, exc: exceptions.HttpException)
 
 @login_required
 @catch_storage_exceptions
-def download_file_view(request: HttpRequest, pk: uuid.UUID):
+def download_file_view(request: RequestType, pk: uuid.UUID):
     """Download a file synchronously or start a directory archive job."""
     try:
         fs_node: FsNode = FsNode.active.get(id=pk)
@@ -72,7 +72,7 @@ def download_file_view(request: HttpRequest, pk: uuid.UUID):
 
 
 @login_required
-def archive_job_wait_view(request: HttpRequest, job_id: uuid.UUID):
+def archive_job_wait_view(request: RequestType, job_id: uuid.UUID):
     """HTML page that waits for an archive and redirects to the ZIP."""
     try:
         job, _root = archive_delivery.get_archive_job_for_owner(
@@ -119,7 +119,7 @@ def archive_job_wait_view(request: HttpRequest, job_id: uuid.UUID):
 
 @login_required
 @catch_storage_exceptions
-def archive_job_status_view(request: HttpRequest, job_id: uuid.UUID):
+def archive_job_status_view(request: RequestType, job_id: uuid.UUID):
     """JSON status endpoint used by the waiting page and API clients."""
     job, _root = archive_delivery.get_archive_job_for_owner(
         request.user,
@@ -140,7 +140,7 @@ def archive_job_status_view(request: HttpRequest, job_id: uuid.UUID):
 
 @login_required
 @catch_storage_exceptions
-def archive_job_file_view(request: HttpRequest, job_id: uuid.UUID):
+def archive_job_file_view(request: RequestType, job_id: uuid.UUID):
     """Serve a ready archive, or ask the client to retry while it is built."""
     job, _root = archive_delivery.get_archive_job_for_owner(
         request.user,
@@ -179,7 +179,7 @@ def archive_job_file_view(request: HttpRequest, job_id: uuid.UUID):
 @login_not_required
 @csrf_exempt
 @catch_storage_exceptions
-def upload_file_view(request: HttpRequest, token: str):
+def upload_file_view(request: RequestType, token: str):
     """
     Upload file.
 
@@ -190,6 +190,10 @@ def upload_file_view(request: HttpRequest, token: str):
             token=token,
             status=TempUpload.Status.UPLOADING,
             fs_node__deleted_at__isnull=True,
+            # The node may have been moved to the trash or retained as
+            # scaffolding while the upload was pending.
+            fs_node__trashed_at__isnull=True,
+            fs_node__trash_retained_at__isnull=True,
         )
     except TempUpload.DoesNotExist:
         raise NotFound('Upload not found')  # TODO: specify/translate error text

@@ -77,8 +77,8 @@ class FsNodeByIdApiTests(TestCase):
     def test_get_invalid_uuid_is_not_found(self) -> None:
         self.assertEqual(self.client.get("/api/v1/fs-node/not-a-uuid/").status_code, 404)
 
-    def test_delete_by_id(self) -> None:
-        response = self.client.delete(self._url(self.root.pk))
+    def test_delete_by_id_permanent(self) -> None:
+        response = self.client.delete(self._url(self.root.pk) + "?permanent=true")
         self.assertEqual(response.status_code, 202)
         data = response.json()
         job = FsNodeDeletionJob.objects.get(pk=data["job_id"])
@@ -87,6 +87,16 @@ class FsNodeByIdApiTests(TestCase):
         self.assertEqual(job.total_nodes, 3)
         self.assertEqual(FsNode.active.filter(owner=self.user).count(), 0)
         # The foreign node is not affected.
+        self.assertTrue(FsNode.active.filter(pk=self.foreign.pk).exists())
+
+    def test_delete_by_id_moves_to_trash_by_default(self) -> None:
+        response = self.client.delete(self._url(self.root.pk))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["id"], str(self.root.pk))
+        self.assertIn("trashed_at", data)
+        self.assertEqual(FsNode.active.filter(owner=self.user).count(), 0)
+        self.assertEqual(FsNode.trash.filter(owner=self.user).count(), 3)
         self.assertTrue(FsNode.active.filter(pk=self.foreign.pk).exists())
 
     def test_delete_by_id_keeps_foreign_node(self) -> None:

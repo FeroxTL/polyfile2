@@ -49,9 +49,17 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
   powered by django-axes. Login lockouts render a styled page; API-key lockouts return
   HTTP 429.
 - A standalone load-testing harness (locust + httpx) with an API smoke flow, a disk-usage guard and static HTML reports, living in the separate `polyfile-e2e` project under its `perf_tests/` directory.
+- Trash (recycle bin): deleted nodes are kept restorable for 30 days (configurable with
+  `POLYFILE_TRASH_TTL_DAYS`), listed under `/trash`, restorable to their original path and
+  purgeable individually or all at once. Public links are revoked when a node is trashed.
 
 ## Changed
 
+- `DELETE /api/v1/fs-node/<uuid>/` now moves the node to the Trash and returns `200` with
+  the trashed entry. Use `?permanent=true` for the previous asynchronous deletion
+  (`202 Accepted` with a job id).
+- Permanently deleting a directory leaves files that were previously trashed untouched:
+  they stay in the Trash, and only the ancestor directories become invisible scaffolding.
 - `DELETE` requests for non-empty directories now return `202 Accepted` with a job id
   instead of deleting synchronously.
 - `POST /api/v1/fs-node/touch` accepts an optional `replace` flag (default `false`) and
@@ -74,7 +82,10 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 ## Upgrade notes
 
 - Apply migrations: `polyfile migrate`. This includes django-axes migrations that add
-  `AccessAttempt`, `AccessLog` and related tables.
+  `AccessAttempt`, `AccessLog` and related tables, and the trash fields on `FsNode`.
+- Trash entries are purged by `run_deletion_worker` (sweep every 300 seconds by default,
+  `--trash-sweep-interval 0` disables it) or by the `purge_expired_trash` command when the
+  worker is not run as a daemon.
 - Configure `AXES_BEHIND_PROXY`, `AXES_IPWARE_PROXY_COUNT` and
   `AXES_IPWARE_META_PRECEDENCE_ORDER` when running behind a reverse proxy.
 - API keys require the new `accounts.0003_apikey` migration. Set

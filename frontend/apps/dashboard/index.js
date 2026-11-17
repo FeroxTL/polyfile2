@@ -1,7 +1,8 @@
-import {FILES_DASHBOARD_URL, DEFAULT_ROOT_URL, SHARES_DASHBOARD_URL} from "./constants/endpoints";
+import {FILES_DASHBOARD_URL, DEFAULT_ROOT_URL, SHARES_DASHBOARD_URL, TRASH_DASHBOARD_URL} from "./constants/endpoints";
 import { DashboardView } from "./dashboard";
 import { loadDashboardRoute } from "./route";
 import { SharesDashboardView } from "./views/SharesDashboardView";
+import { TrashDashboardView } from "./views/TrashDashboardView";
 import m from "mithril";
 
 /**
@@ -36,4 +37,5 @@ m.route(document.body, DEFAULT_ROOT_URL, {
     }
   },
   [SHARES_DASHBOARD_URL]: SharesDashboardView,
+  [TRASH_DASHBOARD_URL]: TrashDashboardView,
 });

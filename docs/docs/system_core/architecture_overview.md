@@ -42,6 +42,7 @@ polyfile/
 - **Path-based API** - Logical paths like `/api/files/folder/file.txt` 
 - **Recursive tree format** - API returns nested structure with `current` node and `children`
 - **Tombstone pattern** - Soft deletes via `deleted_at` for background cleanup
+- **Trash before deletion** - Deletes move nodes to a 30-day recycle bin (`trashed_at`); permanent deletion and TTL purges tombstone nodes, while previously trashed items survive as invisible retained scaffolding (`trash_retained_at`)
 - **Signed tokens** - Secure public sharing without exposing internal paths/IDs directly
 - **Backend-agnostic** - Storage layer abstracts physical storage implementation
 - **CTE-based queries** - Uses `django-cte` for efficient tree traversal with path computation

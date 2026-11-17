@@ -12,9 +12,6 @@ from polyfile.apps.storage import model_fields
 from polyfile.apps.storage.handler import registered_backends
 from polyfile.apps.storage.storage_objects import StorageObjectRef
 
-if typing.TYPE_CHECKING:
-    from polyfile.apps.share.models import SharedNode
-
 
 def get_backend_choices() -> dict[str, str]:
     return {
@@ -179,8 +176,23 @@ class AbstractFsNode(models.Model, StandardModelType['AbstractFsNode']):
 
 
 class ActiveFsNodeManager(models.Manager):
+    """Visible nodes only: not tombstoned, not in the trash, not retained scaffolding."""
     def get_queryset(self):
-        return super().get_queryset().filter(deleted_at__isnull=True)
+        return super().get_queryset().filter(
+            deleted_at__isnull=True,
+            trashed_at__isnull=True,
+            trash_retained_at__isnull=True,
+        )
+
+
+class TrashFsNodeManager(models.Manager):
+    """Trashed nodes that are still restorable (not purged, not retained scaffolding)."""
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            trashed_at__isnull=False,
+            deleted_at__isnull=True,
+            trash_retained_at__isnull=True,
+        )
 
 
 class FsNode(AbstractFsNode):
@@ -228,7 +240,8 @@ class FsNode(AbstractFsNode):
         auto_now_add=True,
     )
 
-    # deleted_at + FsNodeDeletionJob is a tombstone for background cleanup, not a recycle bin
+    # deleted_at + FsNodeDeletionJob is a tombstone for background cleanup:
+    # the final stage after permanent deletion or a trash purge.
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     deletion_job = models.ForeignKey(
         FsNodeDeletionJob,
@@ -239,18 +252,37 @@ class FsNode(AbstractFsNode):
         db_index=True,
     )
 
+    # Trash (recycle bin) state. Trashed nodes stay attached to the tree but
+    # are excluded from the `active` manager until restored or purged.
+    trashed_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    # UUID of the trash operation: nodes trashed together share one batch.
+    # Restoring an entry restores exactly one batch, which keeps the restored
+    # subtree free of internal name conflicts.
+    trash_batch_id = models.UUIDField(null=True, blank=True, db_index=True)
+    # Denormalized TTL: the node is purged after this timestamp.
+    trash_purge_after = models.DateTimeField(null=True, blank=True, db_index=True)
+    # Retained scaffolding: directories kept only as the path to trashed
+    # descendants. Invisible both in the file manager and in the trash.
+    trash_retained_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     objects = models.Manager()
     active = ActiveFsNodeManager()
+    trash = TrashFsNodeManager()
 
     class Meta:
         verbose_name = "Node"
         verbose_name_plural = "Nodes"
         constraints = [
             # Unique constraint for non-root nodes: active nodes must have unique names
-            #  within the same parent and storage. Tombstones may have duplicate names.
+            #  within the same parent and storage. Tombstones, trashed and retained
+            #  nodes may have duplicate names.
             models.UniqueConstraint(
                 fields=["name", "parent", "storage"],
-                condition=Q(deleted_at__isnull=True),
+                condition=Q(
+                    deleted_at__isnull=True,
+                    trashed_at__isnull=True,
+                    trash_retained_at__isnull=True,
+                ),
                 name="uniq_active_name_parent_storage",
             ),
             # Unique constraint for root nodes (parent is null):
@@ -258,7 +290,12 @@ class FsNode(AbstractFsNode):
             # Default SQL behavior (parent=NULL) allows to have duplicates.
             models.UniqueConstraint(
                 fields=["name", "storage", "owner"],
-                condition=Q(parent__isnull=True, deleted_at__isnull=True),
+                condition=Q(
+                    parent__isnull=True,
+                    deleted_at__isnull=True,
+                    trashed_at__isnull=True,
+                    trash_retained_at__isnull=True,
+                ),
                 name="uniq_active_root_name_storage",
             ),
         ]

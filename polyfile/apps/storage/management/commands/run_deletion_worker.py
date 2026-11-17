@@ -37,6 +37,10 @@ from polyfile.apps.storage.models import (
     FsNodeDeletionJob,
     PendingObjectDeletion,
 )
+from polyfile.apps.storage.trash_service import (
+    enqueue_expired_trash_purges,
+    reap_trash_scaffolding,
+)
 
 
 class JobClaimStrategy(ABC):
@@ -67,6 +71,9 @@ class DeletionWorker(BaseCommand):
         self.strategy = JobStrategyFactory.get_strategy()
         self.lock_timeout: int = lock_timeout
         self.max_attempts: int = max_attempts
+        # Throttle for the trash sweep; set to 0 to disable it.
+        self.trash_sweep_interval: int = 300
+        self._last_trash_sweep: float = 0.0
 
     def add_arguments(self, parser) -> None:
         """Add command-line arguments to the parser."""
@@ -75,6 +82,12 @@ class DeletionWorker(BaseCommand):
         parser.add_argument("--batch-size", type=int, default=100, help="Number of nodes to process per batch")
         parser.add_argument("--lock-timeout", type=int, default=self.lock_timeout, help="Lock timeout in seconds")
         parser.add_argument("--max-attempts", type=int, default=self.max_attempts, help="Max attempts before marking FAILED")
+        parser.add_argument(
+            "--trash-sweep-interval",
+            type=int,
+            default=self.trash_sweep_interval,
+            help="Seconds between expired-trash sweeps (0 disables the sweep)",
+        )
 
     def _handle_signal(self, signum: int, frame) -> None:
         """Handle OS signals for graceful exit."""
@@ -92,6 +105,7 @@ class DeletionWorker(BaseCommand):
         batch_size = options["batch_size"]
         self.lock_timeout = options["lock_timeout"]
         self.max_attempts = options["max_attempts"]
+        self.trash_sweep_interval = options["trash_sweep_interval"]
         worker_id = f"{socket.gethostname()}:{os.getpid()}"
 
         signal.signal(signal.SIGINT, self._handle_signal)
@@ -102,6 +116,7 @@ class DeletionWorker(BaseCommand):
         while self.keep_running:
             self._reanimate_stale_jobs()
             self._process_outbox(batch_size)
+            self._sweep_expired_trash()
             job = self._claim_job(worker_id)
             if job is None:
                 if once:
@@ -126,6 +141,31 @@ class DeletionWorker(BaseCommand):
             self._process_outbox(batch_size)
             if once:
                 break
+
+    def _sweep_expired_trash(self) -> int:
+        """Enqueue purge jobs for expired trash entries (throttled).
+
+        Also reaps retained scaffolding that no longer protects anything.
+        ``0`` interval disables the sweep.
+        """
+        if self.trash_sweep_interval <= 0:
+            return 0
+        current = time.monotonic()
+        if current - self._last_trash_sweep < self.trash_sweep_interval:
+            return 0
+        self._last_trash_sweep = current
+        try:
+            created = enqueue_expired_trash_purges()
+            reaped = reap_trash_scaffolding()
+        except (OSError, DatabaseError, TimeoutError) as exc:
+            self.stdout.write(self.style.WARNING(f"Trash sweep failed: {exc}"))
+            return 0
+        if created or reaped:
+            self.stdout.write(
+                f"Trash sweep: purged {created} entr{'y' if created == 1 else 'ies'}, "
+                f"reaped {reaped} scaffold node{'s' if reaped != 1 else ''}"
+            )
+        return created
 
     def _reanimate_stale_jobs(self) -> None:
         """Identify and reset jobs that have been timed out or reached max attempts."""

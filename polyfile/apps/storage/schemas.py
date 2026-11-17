@@ -187,3 +187,52 @@ class FsNodeCreateByNameRequestSchema(Schema):
 class FsNodeTouchRequestSchema(FsNodeCreateByNameRequestSchema):
     """File upload session params: create or replace an existing file node."""
     replace = fields.Bool(load_default=False)
+
+
+# == Trash ==
+
+RESTORE_CONFLICT_FAIL = "fail"
+RESTORE_CONFLICT_RENAME = "rename"
+RESTORE_CONFLICT_CHOICES = (RESTORE_CONFLICT_FAIL, RESTORE_CONFLICT_RENAME)
+
+
+class TrashEntrySchema(Schema):
+    """Trash list item: name, type (icon) and the deletion date."""
+    id = fields.UUID(dump_only=True)
+    name = fields.Str(dump_only=True)
+    type = fields.Str(dump_only=True)
+    trashed_at = fields.DateTime(dump_only=True)
+    trash_purge_after = fields.DateTime(dump_only=True)
+
+
+class TrashListResponseSchema(Schema):
+    """Trash list response."""
+    entries = fields.Nested(TrashEntrySchema(), many=True, dump_only=True)
+
+
+class TrashRestoreRequestSchema(Schema):
+    """Trash restore params."""
+    on_conflict = fields.Str(
+        validate=validate.OneOf(RESTORE_CONFLICT_CHOICES),
+        load_default=RESTORE_CONFLICT_FAIL,
+    )
+
+
+class TrashRestoredEntrySchema(Schema):
+    """Trash entry restored implicitly (a trashed ancestor of the target)."""
+    id = fields.UUID(dump_only=True)
+    name = fields.Str(dump_only=True)
+    type = fields.Str(dump_only=True)
+
+
+class TrashRestoreNoticeSchema(Schema):
+    """Restore side effect on the way to the original location."""
+    type = fields.Str(dump_only=True)
+    name = fields.Str(dump_only=True)
+
+
+class TrashRestoreResponseSchema(Schema):
+    """Trash restore response: restored node plus what happened on the way."""
+    node = fields.Nested(FsNodeItemSchema(), dump_only=True)
+    restored_entries = fields.Nested(TrashRestoredEntrySchema(), many=True, dump_only=True)
+    notices = fields.Nested(TrashRestoreNoticeSchema(), many=True, dump_only=True)

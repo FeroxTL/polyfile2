@@ -113,7 +113,9 @@ def get_fs_node_ancestors(
 
     by_id = {
         node.id: node
-        for node in FsNode.objects.filter(id__in=ancestor_ids).only('id', 'name')
+        # The chain was resolved from the active manager; filter again so a
+        # node that left the active state mid-walk cannot leak into the result.
+        for node in FsNode.active.filter(id__in=ancestor_ids).only('id', 'name')
     }
     return [by_id[ancestor_id] for ancestor_id in ancestor_ids]
 

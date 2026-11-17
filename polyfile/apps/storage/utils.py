@@ -9,6 +9,7 @@ import magic
 import marshmallow
 from django.core.files import File
 from django.db import models, transaction
+from django.db.models import Q
 from django.utils.timezone import now
 from django_cte import CTE, with_cte
 
@@ -24,6 +25,12 @@ from polyfile.apps.storage.schemas import get_fs_node_name_validator
 from polyfile.core import exceptions
 
 logger = logging.getLogger(__name__)
+
+
+class DeletionMode:
+    """Marking modes for :func:`mark_subtree_for_deletion`."""
+    PERMANENT = "permanent"
+    PURGE = "purge"
 
 
 def get_md5_sum(file: File) -> str:
@@ -229,13 +236,35 @@ def create_fs_node(
     return fs_node
 
 
-def _remove_fs_node(user: User, fs_node: FsNode) -> FsNodeDeletionJob:
+def mark_subtree_for_deletion(
+        user: User,
+        fs_node: FsNode,
+        deletion_mode: str,
+) -> FsNodeDeletionJob:
     """
-    Tombstone the node subtree and schedule its physical removal.
+    Tombstone the subtree of ``fs_node`` and schedule its physical removal.
 
-    Uses asynchronous deletion: marks subtree as deleted (tombstone) and schedules
-    a background job for physical removal.
+    Single marking algorithm shared by permanent deletion (from the file
+    manager) and trash purging:
+
+    - ``protected`` nodes survive: already tombstoned (``deleted_at``),
+      retained scaffolding (``trash_retained_at``) and trash entries of a
+      foreign batch (permanent mode: any trashed node).
+    - Their ancestors inside the subtree become retained scaffolding
+      (``trash_retained_at``) and lose their trash flags.
+    - Everything else is tombstoned (``deleted_at`` + ``deletion_job``).
+
+    :param user: Subtree owner.
+    :param fs_node: Subtree root: an active node for permanent deletion or a
+        trash entry root for purging.
+    :param deletion_mode: ``permanent`` or ``purge``.
+    :return: The created ``FsNodeDeletionJob``.
+    :raises ValueError: On an unknown deletion mode.
+    :raises FsNode.DoesNotExist: If the root no longer matches the mode's state.
     """
+    if deletion_mode not in (DeletionMode.PERMANENT, DeletionMode.PURGE):
+        raise ValueError(f"Unknown deletion mode: {deletion_mode}")
+
     with transaction.atomic():
         job = FsNodeDeletionJob.objects.create(
             owner=user,
@@ -244,26 +273,72 @@ def _remove_fs_node(user: User, fs_node: FsNode) -> FsNodeDeletionJob:
             status=FsNodeDeletionJob.Status.PENDING,
         )
 
-        # Get all descendants via CTE-like approach using recursion
+        if deletion_mode == DeletionMode.PERMANENT:
+            anchor = FsNode.active.filter(pk=fs_node.pk, owner=user)
+        else:
+            anchor = FsNode.trash.filter(pk=fs_node.pk, owner=user)
+        if not anchor.exists():
+            # The root was changed concurrently (trashed, purged or restored).
+            raise FsNode.DoesNotExist(
+                f'Node "{fs_node.pk}" no longer matches the "{deletion_mode}" deletion mode'
+            )
+
+        # Get all descendants via CTE-like approach using recursion.
         cte = CTE.recursive(
-            lambda cte: FsNode.active.filter(pk=fs_node.pk, owner=user, deleted_at__isnull=True)
-            .values("pk")
+            lambda cte: FsNode.objects.filter(pk=fs_node.pk, owner=user)
+            .values("pk", "parent_id")
             .union(
-                cte.join(FsNode, parent_id=cte.col.pk).values("pk"),
+                cte.join(FsNode, parent_id=cte.col.pk).values("pk", "parent_id"),
                 all=True,
             )
         )
-        rows = with_cte(cte, select=cte.join(FsNode, pk=cte.col.pk).values("pk"))
+        rows = with_cte(cte, select=cte.join(FsNode, pk=cte.col.pk).values("pk", "parent_id"))
         subtree_ids = [row["pk"] for row in rows]
+        parent_of = {row["pk"]: row["parent_id"] for row in rows}
 
         if subtree_ids:
+            subtree = FsNode.objects.filter(pk__in=subtree_ids)
+            protected_filter = Q(deleted_at__isnull=False) | Q(trash_retained_at__isnull=False)
+            if deletion_mode == DeletionMode.PERMANENT:
+                protected_filter |= Q(trashed_at__isnull=False)
+            else:
+                protected_filter |= Q(trashed_at__isnull=False) & ~Q(trash_batch_id=fs_node.trash_batch_id)
+
+            protected_ids = set(
+                subtree.filter(protected_filter).values_list("pk", flat=True)
+            )
+            # Ancestors of protected nodes inside the subtree become retained
+            # scaffolding. The parent map only contains subtree rows, so the
+            # walk naturally stops at the subtree root.
+            ancestors: set = set()
+            for protected_id in protected_ids:
+                current = parent_of.get(protected_id)
+                while current is not None and current in parent_of:
+                    ancestors.add(current)
+                    current = parent_of[current]
+            retained_ids = ancestors - protected_ids
+            doomed_ids = set(subtree_ids) - protected_ids - ancestors
+
+            if retained_ids:
+                # Retained scaffolding must never keep trash flags: a purged
+                # entry disappears from the trash immediately and un-revealing
+                # it later yields a plain active (empty) directory.
+                FsNode.objects.filter(pk__in=retained_ids).update(
+                    trash_retained_at=now(),
+                    trashed_at=None,
+                    trash_batch_id=None,
+                    trash_purge_after=None,
+                )
+
+            if doomed_ids:
+                FsNode.objects.filter(pk__in=doomed_ids).update(
+                    deleted_at=now(),
+                    deletion_job=job,
+                )
+
             # A deleted root invalidates its archive: release the manifest
             # before tombstoning the nodes so the deletion worker can proceed.
             cancel_archive_jobs_for_subtree(subtree_ids)
-            FsNode.objects.filter(pk__in=subtree_ids).update(
-                deleted_at=now(),
-                deletion_job=job,
-            )
             # Revoke shares
             SharedNode.objects.filter(root_fs_node_id__in=subtree_ids, revoked_at__isnull=True).update(
                 revoked_at=now(),
@@ -271,17 +346,18 @@ def _remove_fs_node(user: User, fs_node: FsNode) -> FsNodeDeletionJob:
             # Cancel temp uploads
             TempUpload.objects.filter(fs_node_id__in=subtree_ids).delete()
 
-        job.total_nodes = len(subtree_ids)
+        job.total_nodes = len(doomed_ids)
         job.save(update_fields=("total_nodes",))
         return job
 
 
 def remove_fs_node(user: User, node_id: uuid.UUID) -> FsNodeDeletionJob:
     """
-    Remove FsNode (file/directory) by its UUID.
+    Permanently remove FsNode (file/directory) by its UUID.
 
     Uses asynchronous deletion: marks subtree as deleted (tombstone) and schedules
-    a background job for physical removal.
+    a background job for physical removal. Trashed nodes survive (trash entries
+    are protected; their ancestors become retained scaffolding).
     """
     try:
         fs_node = FsNode.active.get(id=node_id, owner=user)
@@ -290,4 +366,9 @@ def remove_fs_node(user: User, node_id: uuid.UUID) -> FsNodeDeletionJob:
             detail=f'Can not access node "{node_id}" - no such file or directory',
         )
 
-    return _remove_fs_node(user, fs_node)
+    try:
+        return mark_subtree_for_deletion(user, fs_node, deletion_mode=DeletionMode.PERMANENT)
+    except FsNode.DoesNotExist as exc:
+        raise exceptions.FsNodeNotFoundError(
+            detail=f'Can not access node "{node_id}" - no such file or directory',
+        ) from exc

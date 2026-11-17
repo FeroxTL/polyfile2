@@ -27,10 +27,13 @@ const sendRequest = (vnode) => {
     return Promise.resolve();
   }
 
-  // Delete by UUID; all return 202 Accepted
+  const permanent = Boolean(vnode.state.permanent);
+
+  // Delete by UUID: permanent items get 202 Accepted, trashed items 200.
   const requests = vnode.state.removeList.map((item) =>
     m.request(m.buildPathname(API_V1_FSNODE_BY_ID, { id: item.id }), {
       method: "DELETE",
+      ...(permanent ? { params: { permanent: "true" } } : {}),
     }),
   );
 
@@ -54,10 +57,15 @@ const sendRequest = (vnode) => {
 const RemoveFsNodeModalComponent = {
   oninit(vnode) {
     vnode.state.error = null;
+    vnode.state.permanent = false;
     vnode.state.removeList = DashboardFsNodeList.elements.filter(item => item.selected);
   },
 
   view(vnode) {
+    const permanent = Boolean(vnode.state.permanent);
+    const count = vnode.state.removeList.length;
+    const label = permanent ? "Delete permanently" : "Move to Trash";
+
     return (
       m(Modal, vnode.attrs,
         m(".modal-dialog",
@@ -71,11 +79,20 @@ const RemoveFsNodeModalComponent = {
             }, [
               m(".modal-body", [
                 vnode.state.error && m(".alert alert-danger", getDetailFromError(vnode.state.error)),
-                m("p", "This file will be removed"),
+                permanent
+                  ? m("p", `${count === 1 ? "This item" : "These items"} will be deleted immediately and forever. Items already in the Trash will stay in the Trash. This cannot be undone.`)
+                  : m("p", `${count === 1 ? "This item" : "These items"} will be moved to the Trash and kept for 30 days. You can restore them later.`),
+                m(".form-check", [
+                  m("input.form-check-input[type=checkbox][id=permanent-delete]", {
+                    checked: permanent,
+                    onchange: (e) => { vnode.state.permanent = e.target.checked; },
+                  }),
+                  m("label.form-check-label[for=permanent-delete]", "Delete permanently, bypassing the Trash"),
+                ]),
               ]),
               m(".modal-footer", [
                 m(Button, { type: "button", class: "btn-secondary", onclick: () => {closeModal(vnode.attrs.modalId)}}, "Cancel"),
-                m(Button, { type: "submit", class: "btn-danger" }, "Remove"),
+                m(Button, { type: "submit", class: permanent ? "btn-danger" : "btn-primary" }, label),
               ]),
             ]),
           ])

@@ -22,7 +22,11 @@ class ActiveShareNodeManager(models.Manager):
             .filter(
                 Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()),
                 revoked_at__isnull=True,
+                # A share root in the trash or retained as scaffolding is not
+                # publicly accessible even if the share row was not revoked.
                 root_fs_node__deleted_at__isnull=True,
+                root_fs_node__trashed_at__isnull=True,
+                root_fs_node__trash_retained_at__isnull=True,
             )
         )
 

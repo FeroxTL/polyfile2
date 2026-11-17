@@ -77,6 +77,10 @@ if AXES_BEHIND_PROXY:
 else:
     AXES_IPWARE_META_PRECEDENCE_ORDER = ["REMOTE_ADDR"]
 
+# Trash (recycle bin): entries are purged automatically after this many days.
+# 0 or a negative value disables automatic purging.
+POLYFILE_TRASH_TTL_DAYS = env.int("POLYFILE_TRASH_TTL_DAYS", 30)
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

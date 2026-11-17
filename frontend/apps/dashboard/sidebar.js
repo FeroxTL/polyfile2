@@ -82,7 +82,10 @@ export const DashboardSideBar = {
           m("li.nav-item", { key: item.id }, m(NavLink, {
             href: item.url,
             class: vnode.attrs.activeId === item.id ? "bg-primary-subtle text-primary-emphasis" : ""
-          }, item.name))
+          }, [
+            item.icon && m("i.fa", {class: `${item.icon} me-2`}),
+            m("span", item.name)
+          ]))
         ))),
 
         // Account Menu
