@@ -1,5 +1,5 @@
 import m from "mithril";
-import {uploadFile} from "../modals/uploader";
+import {uploadFile} from "../modals/Uploader";
 
 /*
  * Empty directory component

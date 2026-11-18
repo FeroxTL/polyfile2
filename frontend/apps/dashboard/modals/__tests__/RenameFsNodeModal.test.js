@@ -14,7 +14,7 @@ import { DashboardFsNodeList } from "../../services/DashboardFsNodeList";
 import {
   RenameFsNodeModal,
   sendRenameFsNodeRequest,
-} from "../rename_fsnode_modal";
+} from "../RenameFsNodeModal";
 
 const NODE_ID = "11111111-1111-1111-1111-111111111111";
 

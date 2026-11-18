@@ -2,8 +2,8 @@ import m from "mithril";
 
 import { DashboardShell } from "../components/DashboardShell";
 import { TrashList } from "../services/TrashList";
-import { showTrashConfirmModal } from "../modals/trash_confirm_modal";
-import { showRestoreMonitorModal } from "../modals/restore_monitor_modal";
+import { showTrashConfirmModal } from "../modals/TrashConfirmModal";
+import { showRestoreMonitorModal } from "../modals/RestoreMonitorModal";
 import Button from "@polyfile/core/ui-kit/button";
 
 const formatDate = (value) => {

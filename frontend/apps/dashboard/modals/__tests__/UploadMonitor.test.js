@@ -6,7 +6,7 @@ import { UploadManager } from "../../services/UploadManager";
 import {
   UploadMonitorDocked,
   UploadMonitorModal,
-} from "../upload_monitor";
+} from "../UploadMonitor";
 
 const makeJob = (overrides = {}) => ({
   id: "upload-1",

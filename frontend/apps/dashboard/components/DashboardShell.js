@@ -1,7 +1,7 @@
 import m from "mithril";
 import { DashboardSideBar } from "../sidebar";
 import { ModalsAndBackdrop } from "../bootstrap/modal";
-import { UploadMonitorDocked } from "../modals/upload_monitor";
+import { UploadMonitorDocked } from "../modals/UploadMonitor";
 import { DashboardMobileNavBarView } from "./DashboardMobileNavBarView";
 
 const getActiveId = () => {

@@ -5,7 +5,7 @@ import {
 import { API_V1_FSNODE_BY_ID } from "../constants/endpoints";
 import Button from "@polyfile/core/ui-kit/button";
 import {DashboardFsNodeList} from "../services/DashboardFsNodeList";
-import { getApiErrorDetail } from "./errors";
+import { getApiErrorDetail } from "./Errors";
 import m from "mithril";
 
 

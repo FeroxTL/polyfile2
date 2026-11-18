@@ -12,7 +12,7 @@ import {
   toDateTimeLocalValue,
   toExpiresAt,
   validateExpiration,
-} from "./share_expiration";
+} from "./ShareExpiration";
 
 const ERROR_CODE_ZERO = 0;
 const COPY_FEEDBACK_TIMEOUT_MS = 2000;

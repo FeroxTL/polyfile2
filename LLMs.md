@@ -67,7 +67,7 @@ Trash state lives on `FsNode`: `trashed_at`, `trash_batch_id`, `trash_purge_afte
 
 **TTL:** `POLYFILE_TRASH_TTL_DAYS` (env, default 30) is denormalized into `trash_purge_after` at trash time, so changing the setting does not affect existing entries. Sweeps run inside `run_deletion_worker` (`--trash-sweep-interval`, 0 disables) and via the `purge_expired_trash` command; both only *create* jobs — physical removal stays with the deletion worker.
 
-**Frontend:** `/trash` route (`TrashDashboardView`) shows only the objects the user actually deleted (name, icon, date; nested content is not browsable); selection swaps the header for "Restore / Delete permanently", without selection it shows "Empty trash". `restore_monitor_modal.js` mirrors the upload monitor: per-entry states, a "Keep both / Skip" question on `409`, and a summary of implicit restores and notices. The remove dialog has a "Delete permanently, bypassing the Trash" checkbox; cancelled uploads always delete permanently.
+**Frontend:** `/trash` route (`TrashDashboardView`) shows only the objects the user actually deleted (name, icon, date; nested content is not browsable); selection swaps the header for "Restore / Delete permanently", without selection it shows "Empty trash". `RestoreMonitorModal.js` mirrors the upload monitor: per-entry states, a "Keep both / Skip" question on `409`, and a summary of implicit restores and notices. The remove dialog has a "Delete permanently, bypassing the Trash" checkbox; cancelled uploads always delete permanently.
 
 ## FsNode identity (UUID migration, done)
 - `FsNode.id` (UUID) is the canonical identifier for all mutations: create (`parent_id` + `name`), rename (`PATCH /api/v1/fs-node/<uuid:node_id>/` with `{name}`), delete (`DELETE .../<uuid>/`), share (`POST /api/shares/` with `node_id`).
@@ -79,7 +79,7 @@ Trash state lives on `FsNode`: `trashed_at`, `trash_batch_id`, `trash_purge_afte
 
 ## Upload queue & replacement (done)
 - The SPA upload queue is `frontend/apps/dashboard/services/UploadManager.js`: sequential uploads, per-file states (`queued`/`creating`/`uploading`/`conflict`/`error`/`done`/`canceled`), byte-weighted overall progress, `retry`, `replace`, `skip`, `cancelAll`, and a `beforeunload` guard while `hasPendingWork` is true.
-- UI lives in `frontend/apps/dashboard/modals/upload_monitor.js`: `UploadMonitorDocked` (fixed bottom-right panel, desktop) and `UploadMonitorModal` (mobile). The actions menu is custom (no Bootstrap JS) and uses fixed positioning so the panel or modal cannot clip it.
+- UI lives in `frontend/apps/dashboard/modals/UploadMonitor.js`: `UploadMonitorDocked` (fixed bottom-right panel, desktop) and `UploadMonitorModal` (mobile). The actions menu is custom (no Bootstrap JS) and uses fixed positioning so the panel or modal cannot clip it.
 - `POST /api/v1/fs-node/touch` accepts `replace: true`. An existing file node is reused, preserving its UUID and share links; directories cannot be replaced.
 - Conflict responses (`409 FsNodeExistsError`) include `existing_node_id` and `existing_type`. `HttpException.extra` fields are merged into API error JSON.
 - `save_upload()` writes replacements to a fresh object key and queues the previous key in `PendingObjectDeletion` only after the new content is stored. `run_deletion_worker` drains that outbox.

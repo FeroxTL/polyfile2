@@ -8,7 +8,7 @@ vi.mock("../../services/UploadManager", () => ({
 
 import { UploadManager } from "../../services/UploadManager";
 import { DashboardFsNodeList } from "../../services/DashboardFsNodeList";
-import { uploadFile } from "../uploader";
+import { uploadFile } from "../Uploader";
 
 const PARENT_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -19,7 +19,7 @@ const createEvent = (fileNames) => ({
   },
 });
 
-describe("uploader.uploadFile()", () => {
+describe("Uploader.uploadFile()", () => {
   beforeEach(() => {
     DashboardFsNodeList.current = { id: PARENT_ID };
     vi.mocked(UploadManager.enqueueFiles).mockClear();

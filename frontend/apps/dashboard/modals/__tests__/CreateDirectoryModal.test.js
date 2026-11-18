@@ -10,7 +10,7 @@ vi.mock("../../bootstrap/modal", () => ({
 
 import { closeModal } from "../../bootstrap/modal";
 import { DashboardFsNodeList } from "../../services/DashboardFsNodeList";
-import { sendCreateDirectoryRequest } from "../create_directory_modal";
+import { sendCreateDirectoryRequest } from "../CreateDirectoryModal";
 
 const PARENT_ID = "11111111-1111-1111-1111-111111111111";
 

@@ -70,13 +70,13 @@ The SPA uploads files through a singleton queue in
 - Replacing reuses the existing `FsNode`, so its UUID and share links do not change.
 - A `beforeunload` listener asks the browser to confirm leaving while `hasPendingWork` is true.
 
-`frontend/apps/dashboard/modals/upload_monitor.js` renders the UI. `UploadMonitorDocked` is the
+`frontend/apps/dashboard/modals/UploadMonitor.js` renders the UI. `UploadMonitorDocked` is the
 fixed bottom-right panel used on desktop (no backdrop); `UploadMonitorModal` reuses the same
 header and body inside a standard modal on mobile. The header collapses the body, shows the
 overall progress and hosts an actions menu with "Cancel all uploads". The menu is implemented
 without Bootstrap JS and uses fixed positioning so the panel or modal cannot clip it.
 
-`frontend/apps/dashboard/modals/uploader.js` adapts file inputs and captures the target
+`frontend/apps/dashboard/modals/Uploader.js` adapts file inputs and captures the target
 `parent_id` at selection time. Component and service tests live next to the modules under
 `__tests__/`.
 

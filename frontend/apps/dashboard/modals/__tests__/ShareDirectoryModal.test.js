@@ -11,8 +11,8 @@ import {
   PRESET_CUSTOM,
   PRESET_NEVER,
   toDateTimeLocalValue,
-} from "../share_expiration";
-import { ShareDirectoryModal, isShareActive, resolveShareStatus } from "../share_directory_modal";
+} from "../ShareExpiration";
+import { ShareDirectoryModal, isShareActive, resolveShareStatus } from "../ShareDirectoryModal";
 
 // Mock ShareService
 const { mockCreate, mockRevoke } = vi.hoisted(() => ({

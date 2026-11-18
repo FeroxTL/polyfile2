@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../components/DashboardShell", () => ({ DashboardShell: {} }));
-vi.mock("../../modals/permanent_delete_share_modal", () => ({
+vi.mock("../../modals/PermanentDeleteShareModal", () => ({
   showPermanentDeleteShareModal: vi.fn(),
 }));
 vi.mock("../../bootstrap/modal", () => ({
@@ -10,12 +10,12 @@ vi.mock("../../bootstrap/modal", () => ({
 }));
 
 import m from "mithril";
-import { showPermanentDeleteShareModal } from "../../modals/permanent_delete_share_modal";
+import { showPermanentDeleteShareModal } from "../../modals/PermanentDeleteShareModal";
 import { showModal } from "../../bootstrap/modal";
 import { ShareList } from "../../services/ShareList";
 import { DashboardFsNodeList } from "../../services/DashboardFsNodeList";
 import { FILES_DASHBOARD_URL } from "../../constants/endpoints";
-import { ShareDirectoryModal } from "../../modals/share_directory_modal";
+import { ShareDirectoryModal } from "../../modals/ShareDirectoryModal";
 import { SharesDashboardView } from "../SharesDashboardView";
 
 const createService = () => ({

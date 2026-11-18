@@ -10,7 +10,7 @@ import { closeModal, showModal } from "../../bootstrap/modal";
 import {
   PermanentDeleteShareModal,
   showPermanentDeleteShareModal,
-} from "../permanent_delete_share_modal";
+} from "../PermanentDeleteShareModal";
 
 const createVnode = (onConfirm = vi.fn().mockResolvedValue()) => ({
   attrs: {

@@ -3,10 +3,10 @@ import { FsNodeList } from "@polyfile/core/services/FsNodeList";
 import { DashboardShell } from "../components/DashboardShell";
 import { DashboardFsNodeList } from "../services/DashboardFsNodeList";
 import { ShareList } from "../services/ShareList";
-import { showPermanentDeleteShareModal } from "../modals/permanent_delete_share_modal";
+import { showPermanentDeleteShareModal } from "../modals/PermanentDeleteShareModal";
 import { API_V1_FSNODE_BY_ID, FILES_DASHBOARD_URL } from "../constants/endpoints";
 import { showModal } from "../bootstrap/modal";
-import { ShareDirectoryModal } from "../modals/share_directory_modal";
+import { ShareDirectoryModal } from "../modals/ShareDirectoryModal";
 import Button from "@polyfile/core/ui-kit/button";
 
 const STATUS_OPTIONS = [

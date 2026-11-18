@@ -6,7 +6,7 @@ import {
 import Button from "@polyfile/core/ui-kit/button";
 import { Input } from "@polyfile/core/ui-kit/input";
 import { getFsNodeNameErrors } from "@polyfile/core/utils/validation";
-import { getApiErrorDetail } from "./errors";
+import { getApiErrorDetail } from "./Errors";
 import m from "mithril";
 import stream from "mithril/stream";
 

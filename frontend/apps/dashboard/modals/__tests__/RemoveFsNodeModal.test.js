@@ -10,7 +10,7 @@ vi.mock("../../bootstrap/modal", () => ({
 import { closeModal } from "../../bootstrap/modal";
 import { DashboardFsNode } from "../../models/DashboardFsNode";
 import { DashboardFsNodeList } from "../../services/DashboardFsNodeList";
-import { sendRemoveFsNodesRequest } from "../remove_fsnode_modal";
+import { sendRemoveFsNodesRequest } from "../RemoveFsNodeModal";
 
 const NODE_A = "11111111-1111-1111-1111-111111111111";
 const NODE_B = "22222222-2222-2222-2222-222222222222";

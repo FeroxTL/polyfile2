@@ -14,7 +14,7 @@ vi.mock("@polyfile/core/ui-kit/button", () => ({
 }));
 
 import { closeModal } from "../../bootstrap/modal";
-import { RestoreMonitorModal } from "../restore_monitor_modal";
+import { RestoreMonitorModal } from "../RestoreMonitorModal";
 
 const ENTRY_A = { id: "11111111-1111-1111-1111-111111111111", name: "a.txt", type: "file" };
 const ENTRY_B = { id: "22222222-2222-2222-2222-222222222222", name: "b.txt", type: "file" };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getApiErrorDetail } from "../errors";
+import { getApiErrorDetail } from "../Errors";
 
 describe("getApiErrorDetail()", () => {
   it("returns a string detail", () => {

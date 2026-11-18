@@ -5,10 +5,10 @@ vi.mock("../../components/DashboardShell", () => ({
     view: (vnode) => vnode.children,
   },
 }));
-vi.mock("../../modals/trash_confirm_modal", () => ({
+vi.mock("../../modals/TrashConfirmModal", () => ({
   showTrashConfirmModal: vi.fn(),
 }));
-vi.mock("../../modals/restore_monitor_modal", () => ({
+vi.mock("../../modals/RestoreMonitorModal", () => ({
   showRestoreMonitorModal: vi.fn(),
 }));
 vi.mock("@polyfile/core/ui-kit/button", () => ({
@@ -19,8 +19,8 @@ vi.mock("@polyfile/core/ui-kit/button", () => ({
 
 import m from "mithril";
 import Button from "@polyfile/core/ui-kit/button";
-import { showTrashConfirmModal } from "../../modals/trash_confirm_modal";
-import { showRestoreMonitorModal } from "../../modals/restore_monitor_modal";
+import { showTrashConfirmModal } from "../../modals/TrashConfirmModal";
+import { showRestoreMonitorModal } from "../../modals/RestoreMonitorModal";
 import { TrashList } from "../../services/TrashList";
 import { TrashDashboardView } from "../TrashDashboardView";
 

@@ -1,9 +1,9 @@
 import m from "mithril";
-import { CreateDirectoryModal } from "./modals/create_directory_modal";
+import { CreateDirectoryModal } from "./modals/CreateDirectoryModal";
 import { NavLink } from "./bootstrap/navlink";
 import Collapse from "./bootstrap/collapse";
 import {showModal} from "./bootstrap/modal";
-import { uploadFile } from "./modals/uploader";
+import { uploadFile } from "./modals/Uploader";
 import { API_V1_LOGOUT } from "./constants/endpoints";
 import Button from "@polyfile/core/ui-kit/button";
 
