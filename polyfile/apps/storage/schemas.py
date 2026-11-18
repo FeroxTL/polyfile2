@@ -5,7 +5,7 @@ import marshmallow.types
 from django.core.exceptions import ObjectDoesNotExist
 from django.http.request import HttpRequest
 from django.urls import reverse
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, validates_schema
 from marshmallow.experimental.context import Context
 
 from polyfile.apps.share.models import SharedNode
@@ -189,9 +189,23 @@ class FsNodeTouchRequestSchema(FsNodeCreateByNameRequestSchema):
     replace = fields.Bool(load_default=False)
 
 
-class FsNodeRenameRequestSchema(Schema):
-    """FsNode rename params: the new leaf name."""
-    name = fields.Str(required=True, validate=get_fs_node_name_validator())
+class FsNodeUpdateRequestSchema(Schema):
+    """FsNode update params: rename (``name``) or move (``parent_id``)."""
+    name = fields.Str(validate=get_fs_node_name_validator())
+    # Absent means "do not move"; an explicit null moves to the virtual root.
+    parent_id = fields.UUID(allow_none=True)
+
+    @validates_schema
+    def validate_update_fields(self, data: dict, **kwargs) -> None:
+        """Require exactly one update kind per request."""
+        if not data:
+            raise marshmallow.ValidationError(
+                "Provide either 'name' (rename) or 'parent_id' (move).",
+            )
+        if "name" in data and "parent_id" in data:
+            raise marshmallow.ValidationError(
+                "Provide either 'name' (rename) or 'parent_id' (move), not both.",
+            )
 
 
 # == Trash ==

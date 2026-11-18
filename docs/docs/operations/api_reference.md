@@ -106,13 +106,24 @@ the existing node so a client can offer replacement:
 
 See [Storage backends](../system_core/storage_backends.md#upload-flow) for upload details.
 
-### Rename node
+### Update node (rename or move)
 `PATCH /api/v1/fs-node/<uuid:node_id>/`
 
-**JSON body:**
-- `name` (required) - New file or directory name (reserved characters `< > : " / \ | ? *` are rejected, 255 characters max)
+**JSON body:** send exactly one of:
+- `name` - New file or directory name (rename; reserved characters `< > : " / \ | ? *` are rejected, 255 characters max)
+- `parent_id` - Destination directory UUID, or `null` to move the node to the virtual root (move)
 
-**Behavior:** Renames the node in place. The node keeps its UUID, parent, type, stored object and public share links; only the leaf name changes. Renaming to the current name is a no-op. Foreign, deleted and trashed UUIDs return 404.
+An empty body, or a body containing both fields, returns `400 FieldValidationError`.
+
+**Rename behavior:** Renames the node in place. The node keeps its UUID, parent, type, stored object and public share links; only the leaf name changes. Renaming to the current name is a no-op. Foreign, deleted and trashed UUIDs return 404.
+
+**Move behavior:** Reparents the node without copying it. The UUID, leaf name, type, stored object key, public shares, the whole subtree and `modified_at` stay unchanged. Moving to the current parent is a no-op. The destination must be an active directory owned by the user on the same storage; otherwise:
+
+- unknown, foreign, deleted or trashed destination UUIDs → `404 FsNodeNotFoundError`
+- a file destination → `409 NotADirectoryError`
+- moving a node into itself or into its own subtree → `400 FsNodeMoveError`
+- moving to a directory on a different storage → `400 FsNodeMoveError`
+- an active sibling with the node's name already exists in the destination → `409 FsNodeExistsError` (no automatic rename)
 
 **Response (example):**
 ```json

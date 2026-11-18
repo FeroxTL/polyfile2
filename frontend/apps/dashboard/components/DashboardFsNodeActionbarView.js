@@ -85,6 +85,7 @@ export const DashboardFsNodeActionbarView = {
       onClose,
       onShare,
       onRename,
+      onMove,
       onRemove,
       onDownload,
     } = vnode.attrs;
@@ -119,7 +120,13 @@ export const DashboardFsNodeActionbarView = {
         renderAction({
           title: "Move",
           icon: "fa-arrow-right-arrow-left",
-          disabled: true,
+          disabled: !selectedItem,
+          onClick: (event) => {
+            event.preventDefault();
+            if (selectedItem && onMove) {
+              onMove(selectedItem);
+            }
+          },
         }),
         renderAction({
           title: "Remove",

@@ -107,6 +107,31 @@ describe("DashboardFsNodeActionbarView", () => {
     expect(renameLink.attrs.className).toContain("disabled");
   });
 
+  it("opens the move modal for the selected item", () => {
+    const selectedItem = {
+      name: "file.txt",
+      type: "file",
+      download_url: "/download/file/",
+    };
+    const onMove = vi.fn();
+    const [, , , moveLink] = getActions(renderActionbar([selectedItem], { onMove }));
+
+    expect(moveLink.attrs.className).not.toContain("disabled");
+
+    moveLink.attrs.onclick({ preventDefault: vi.fn() });
+
+    expect(onMove).toHaveBeenCalledWith(selectedItem);
+  });
+
+  it("disables move when several items are selected", () => {
+    const [, , , moveLink] = getActions(renderActionbar([
+      { name: "a.txt", type: "file", download_url: "/download/a/" },
+      { name: "b.txt", type: "file", download_url: "/download/b/" },
+    ]));
+
+    expect(moveLink.attrs.className).toContain("disabled");
+  });
+
   it("clears the selection from the close button", () => {
     const onClose = vi.fn();
     const actions = getActions(renderActionbar([

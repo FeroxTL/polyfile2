@@ -52,6 +52,10 @@ Remaining work for this release is tracked in the [Roadmap](../contributors/road
 - Trash (recycle bin): deleted nodes are kept restorable for 30 days (configurable with
   `POLYFILE_TRASH_TTL_DAYS`), listed under `/trash`, restorable to their original path and
   purgeable individually or all at once. Public links are revoked when a node is trashed.
+- Moving files and directories between folders from the dashboard. `PATCH /api/v1/fs-node/<uuid>/`
+  now accepts `parent_id` (or `null` for the virtual root) in addition to `name`; the UUID,
+  object key, shares and subtree are preserved, and name conflicts return `409` instead of
+  renaming automatically.
 
 ## Changed
 

@@ -313,6 +313,111 @@ def rename_fs_node(
     return fs_node
 
 
+def _get_move_conflict(
+        user: User,
+        fs_node: FsNode,
+        parent_id: uuid.UUID | None,
+) -> FsNode | None:
+    """Return an active sibling with the node's name in ``parent_id``, if any."""
+    return (
+        FsNode.active.filter(
+            owner=user,
+            storage_id=fs_node.storage_id,
+            parent_id=parent_id,
+            name=fs_node.name,
+        )
+        .exclude(pk=fs_node.pk)
+        .first()
+    )
+
+
+def move_fs_node(
+        user: User,
+        node_id: uuid.UUID,
+        parent_id: uuid.UUID | None,
+) -> FsNode:
+    """
+    Move an active FsNode (file/directory) under a new parent directory.
+
+    Only the parent changes: the UUID, type, leaf name, physical object key,
+    public shares and the whole subtree stay intact. ``parent_id=None`` moves
+    the node to the virtual root. Moving into the node itself or into its own
+    subtree is rejected to keep the tree acyclic, and an active sibling with
+    the same name in the destination is rejected with ``FsNodeExistsError``.
+
+    :param user: FsNode owner.
+    :param node_id: UUID of the node to move.
+    :param parent_id: destination directory UUID; None means the virtual root.
+    :raises HttpException: most of the errors.
+    :return: moved FsNode.
+    """
+    try:
+        fs_node = FsNode.active.get(id=node_id, owner=user)
+    except FsNode.DoesNotExist:
+        raise exceptions.FsNodeNotFoundError(
+            detail=f'Can not access node "{node_id}" - no such file or directory',
+        )
+
+    if fs_node.parent_id == parent_id:
+        return fs_node
+
+    if parent_id is not None and parent_id == fs_node.pk:
+        raise exceptions.FsNodeMoveError(
+            detail=f'Cannot move "{fs_node.name}" into itself',
+        )
+
+    if parent_id is not None:
+        try:
+            parent_fs_node = FsNode.active.get(id=parent_id, owner=user)
+        except FsNode.DoesNotExist:
+            raise exceptions.FsNodeNotFoundError(
+                detail=f'Can not access node "{parent_id}" - no such file or directory',
+            )
+
+        if not parent_fs_node.is_directory:
+            raise exceptions.FsNodeIsNotADirectoryError(
+                detail=f'"{parent_fs_node.name}" is not a directory',
+            )
+
+        if parent_fs_node.storage_id != fs_node.storage_id:
+            raise exceptions.FsNodeMoveError(
+                detail=f'Cannot move "{fs_node.name}" to a different storage',
+            )
+
+        try:
+            ancestors = get_fs_node_ancestors(user=user, node_id=parent_id)
+        except FsNode.DoesNotExist:
+            raise exceptions.FsNodeNotFoundError(
+                detail=f'Can not access node "{parent_id}" - no such file or directory',
+            )
+        if any(ancestor.pk == fs_node.pk for ancestor in ancestors):
+            raise exceptions.FsNodeMoveError(
+                detail=f'Cannot move "{fs_node.name}" into its own subtree',
+            )
+
+    conflict = _get_move_conflict(user=user, fs_node=fs_node, parent_id=parent_id)
+    if conflict is not None:
+        raise _fs_node_exists_error(conflict)
+
+    previous_parent_id = fs_node.parent_id
+    fs_node.parent_id = parent_id
+    try:
+        # The savepoint keeps a caught IntegrityError from poisoning an outer
+        # transaction and lets the conflict lookup run afterwards.
+        with transaction.atomic():
+            fs_node.save(update_fields=("parent",))
+    except IntegrityError as exc:
+        # The partial unique constraint is the final guard: a concurrent
+        # create/move may have created the sibling after our lookup.
+        fs_node.parent_id = previous_parent_id
+        conflict = _get_move_conflict(user=user, fs_node=fs_node, parent_id=parent_id)
+        if conflict is not None:
+            raise _fs_node_exists_error(conflict) from exc
+        raise
+
+    return fs_node
+
+
 def mark_subtree_for_deletion(
         user: User,
         fs_node: FsNode,

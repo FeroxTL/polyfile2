@@ -2,6 +2,7 @@
 import m from "mithril";
 import { FILES_DASHBOARD_URL } from "./constants/endpoints";
 import { showModal } from "./bootstrap/modal";
+import { MoveFsNodeModal } from "./modals/MoveFsNodeModal";
 import { RemoveFsNodeModalComponent } from "./modals/RemoveFsNodeModal";
 import { RenameFsNodeModal } from "./modals/RenameFsNodeModal";
 import { ShareDirectoryModal } from "./modals/ShareDirectoryModal";
@@ -27,6 +28,10 @@ const openShareModal = (fsNode) => {
 
 const openRenameModal = (fsNode) => {
   showModal(RenameFsNodeModal, { fsNode });
+};
+
+const openMoveModal = (fsNode) => {
+  showModal(MoveFsNodeModal, { fsNode });
 };
 
 const openArchiveDownloadModal = (fsNode) => {
@@ -66,6 +71,7 @@ const DashboardView = {
           onClose: () => DashboardFsNodeList.selectFsNode(),
           onShare: openShareModal,
           onRename: openRenameModal,
+          onMove: openMoveModal,
           onRemove: () => showModal(RemoveFsNodeModalComponent),
           onDownload: openArchiveDownloadModal,
         })))
@@ -92,4 +98,9 @@ const DashboardView = {
 };
 
 // Export the components for use in tests and Mithril's mount function
-export { DashboardView, dashboardNavigationHandler, dashboardBreadcrumbHandler };
+export {
+  DashboardView,
+  dashboardNavigationHandler,
+  dashboardBreadcrumbHandler,
+  openMoveModal,
+};

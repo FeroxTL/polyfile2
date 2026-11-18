@@ -80,6 +80,35 @@ export class DashboardFsNodeListService extends FsNodeList {
   }
 
   /**
+   * Move a node under another directory by UUID.
+   *
+   * The node leaves the currently listed directory, so it is removed from
+   * `elements` and deselected on success. A no-op move (the destination is
+   * already the parent) keeps the node in place; failed requests leave the
+   * in-memory list untouched.
+   *
+   * @param {FsNode} fsNode - Node from `elements` to move.
+   * @param {string|null} parentId - Destination directory UUID; `null` means root.
+   * @returns {Promise<Object>} Backend node payload.
+   */
+  moveFsNode(fsNode, parentId) {
+    return m.request(m.buildPathname(API_V1_FSNODE_BY_ID, { id: fsNode.id }), {
+      method: "PATCH",
+      body: { parent_id: parentId },
+    }).then((data) => {
+      const wasListed = this.elements.includes(fsNode);
+      const parentChanged = fsNode.parent_id !== data.parent_id;
+      fsNode.parent_id = data.parent_id;
+
+      if (wasListed && parentChanged) {
+        this.elements = this.elements.filter((item) => item !== fsNode);
+        fsNode.selected = false;
+      }
+      return data;
+    });
+  }
+
+  /**
    * Create or reactivate a public share for a node by its UUID.
    *
    * @param {FsNode} fsNode - Node from `elements` to share.

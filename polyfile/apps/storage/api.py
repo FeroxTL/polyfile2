@@ -18,6 +18,7 @@ from polyfile.apps.storage.utils import (
     create_fs_node,
     get_fs_node_with_children,
     get_fs_node_with_children_by_id,
+    move_fs_node,
     remove_fs_node,
     rename_fs_node,
 )
@@ -27,7 +28,7 @@ from polyfile.core.rest.generics import CreateApiView
 
 
 class FsNodeListApiView(BaseApiView):
-    serializer_class = schemas.FsNodeRenameRequestSchema
+    serializer_class = schemas.FsNodeUpdateRequestSchema
 
     @staticmethod
     def get(request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:
@@ -53,18 +54,25 @@ class FsNodeListApiView(BaseApiView):
 
     @classmethod
     def patch(cls, request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:
-        """Rename an FsNode by UUID; only the leaf name changes."""
+        """Rename an FsNode (``name``) or move it (``parent_id``) by UUID."""
         assert request.user.is_authenticated and isinstance(request.user, User)
 
         if node_id is None:
             raise exceptions.BadRequest("node_id is required")
 
         params = cls.load_params(request)
-        fs_node = rename_fs_node(
-            user=request.user,
-            node_id=node_id,
-            name=params["name"],
-        )
+        if "parent_id" in params:
+            fs_node = move_fs_node(
+                user=request.user,
+                node_id=node_id,
+                parent_id=params["parent_id"],
+            )
+        else:
+            fs_node = rename_fs_node(
+                user=request.user,
+                node_id=node_id,
+                name=params["name"],
+            )
         return cls.json_response(schemas.FsNodeItemSchema().dump(fs_node))
 
     @staticmethod

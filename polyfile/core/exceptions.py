@@ -83,6 +83,14 @@ class FsNodeIsNotADirectoryError(HttpException):
     description = _('Target path is not not a directory.')
 
 
+class FsNodeMoveError(HttpException):
+    """The requested move would create an invalid tree."""
+
+    status_code = 400
+    error_code = "FsNodeMoveError"
+    description = _("Cannot move the node.")
+
+
 class FsNodeExistsError(HttpException):
     status_code = 409
     error_code = 'FsNodeExistsError'
