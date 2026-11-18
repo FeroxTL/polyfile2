@@ -65,6 +65,20 @@ describe("Input", () => {
     expect(input.attrs.className).toBe("form-control mb-2 font-monospace");
   });
 
+  it("focuses and selects the input when requested", () => {
+    const [input] = renderInput({
+      value: "old-name.txt",
+      autofocus: true,
+      selectOnFocus: true,
+    });
+    const dom = { focus: vi.fn(), select: vi.fn() };
+
+    input.attrs.oncreate({ dom });
+
+    expect(dom.focus).toHaveBeenCalledOnce();
+    expect(dom.select).toHaveBeenCalledOnce();
+  });
+
   it("requires a stream or a value", () => {
     expect(() => renderInput({})).toThrow("Argument 'stream' or 'value' is required");
   });

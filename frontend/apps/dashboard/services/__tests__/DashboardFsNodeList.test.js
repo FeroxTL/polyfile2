@@ -142,6 +142,70 @@ describe("DashboardFsNodeListService.revokeShare()", () => {
   });
 });
 
+describe("DashboardFsNodeListService.renameFsNode()", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renames by UUID and updates the node in place", async () => {
+    const request = vi.spyOn(m, "request").mockResolvedValue({
+      id: NODE_ID,
+      name: "renamed.txt",
+      modified_at: "2026-02-01T00:00:00Z",
+    });
+    const service = createService();
+    const share = {
+      id: "token",
+      url: "https://example.com/s/token/",
+    };
+    const fsNode = new DashboardFsNode({
+      id: NODE_ID,
+      name: "file.txt",
+      share,
+    });
+    fsNode.selected = true;
+    service.elements = [
+      new DashboardFsNode({
+        id: "22222222-2222-2222-2222-222222222222",
+        name: "z.txt",
+        type: "file",
+      }),
+      fsNode,
+      new DashboardFsNode({
+        id: "33333333-3333-3333-3333-333333333333",
+        name: "a.txt",
+        type: "directory",
+      }),
+    ];
+
+    await service.renameFsNode(fsNode, "renamed.txt");
+
+    expect(request).toHaveBeenCalledWith(`/api/v1/fs-node/${NODE_ID}/`, {
+      method: "PATCH",
+      body: { name: "renamed.txt" },
+    });
+    expect(fsNode.name).toBe("renamed.txt");
+    expect(fsNode.modified_at).toBe("2026-02-01T00:00:00Z");
+    expect(fsNode.selected).toBe(true);
+    expect(fsNode.share).toEqual(share);
+    expect(service.elements.map((node) => node.name)).toEqual([
+      "a.txt",
+      "renamed.txt",
+      "z.txt",
+    ]);
+  });
+
+  it("keeps the old name when the request fails", async () => {
+    vi.spyOn(m, "request").mockRejectedValue(new Error("network error"));
+    const service = createService();
+    const fsNode = new DashboardFsNode({ id: NODE_ID, name: "file.txt" });
+
+    await expect(service.renameFsNode(fsNode, "renamed.txt"))
+      .rejects.toThrow("network error");
+    expect(fsNode.name).toBe("file.txt");
+  });
+});
+
 describe("DashboardFsNodeListService UUID preload", () => {
   afterEach(() => {
     vi.restoreAllMocks();

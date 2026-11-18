@@ -3,6 +3,7 @@ import m from "mithril";
 import { FILES_DASHBOARD_URL } from "./constants/endpoints";
 import { showModal } from "./bootstrap/modal";
 import { RemoveFsNodeModalComponent } from "./modals/remove_fsnode_modal";
+import { RenameFsNodeModal } from "./modals/rename_fsnode_modal";
 import { ShareDirectoryModal } from "./modals/share_directory_modal";
 import { DashboardFsNodeList } from "./services/DashboardFsNodeList";
 import { DashboardFsNodeListView } from "./components/DashboardFsNodeListView";
@@ -22,6 +23,10 @@ const openShareModal = (fsNode) => {
       fsNode.share = shareData;
     },
   });
+};
+
+const openRenameModal = (fsNode) => {
+  showModal(RenameFsNodeModal, { fsNode });
 };
 
 const openArchiveDownloadModal = (fsNode) => {
@@ -60,6 +65,7 @@ const DashboardView = {
           selectedList,
           onClose: () => DashboardFsNodeList.selectFsNode(),
           onShare: openShareModal,
+          onRename: openRenameModal,
           onRemove: () => showModal(RemoveFsNodeModalComponent),
           onDownload: openArchiveDownloadModal,
         })))

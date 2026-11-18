@@ -2,7 +2,7 @@
 
 ## Overview
 
-The main file management APIs live in `polyfile/apps/storage/api.py`. Read operations are path- or UUID-based; all mutations (create, delete, share) address nodes by their UUID (`FsNode.id`). All file operations go through the storage/tree logic and respect [security constraints](../system_core/security.md).
+The main file management APIs live in `polyfile/apps/storage/api.py`. Read operations are path- or UUID-based; all mutations (create, rename, delete, share) address nodes by their UUID (`FsNode.id`). All file operations go through the storage/tree logic and respect [security constraints](../system_core/security.md).
 
 ## Storage API
 
@@ -105,6 +105,36 @@ the existing node so a client can offer replacement:
 `existing_type` is `file` or `directory`; only files can be replaced.
 
 See [Storage backends](../system_core/storage_backends.md#upload-flow) for upload details.
+
+### Rename node
+`PATCH /api/v1/fs-node/<uuid:node_id>/`
+
+**JSON body:**
+- `name` (required) - New file or directory name (reserved characters `< > : " / \ | ? *` are rejected, 255 characters max)
+
+**Behavior:** Renames the node in place. The node keeps its UUID, parent, type, stored object and public share links; only the leaf name changes. Renaming to the current name is a no-op. Foreign, deleted and trashed UUIDs return 404.
+
+**Response (example):**
+```json
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "parent_id": "6a2e8400-e29b-41d4-a716-446655440001",
+  "name": "renamed-report.pdf",
+  "type": "file"
+}
+```
+
+**Conflict response:** A sibling with the new name already active returns `409 FsNodeExistsError` with the same `existing_node_id` / `existing_type` fields as the upload conflict:
+
+```json
+{
+  "error_id": "FsNodeExistsError",
+  "description": "Target object already exists.",
+  "detail": "File named \"report.pdf\" already exists",
+  "existing_node_id": "6a2e8400-e29b-41d4-a716-446655440001",
+  "existing_type": "file"
+}
+```
 
 ### Delete node
 `DELETE /api/v1/fs-node/<uuid:node_id>/`

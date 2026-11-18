@@ -57,6 +57,29 @@ export class DashboardFsNodeListService extends FsNodeList {
   }
 
   /**
+   * Rename a node by UUID and update it in place.
+   *
+   * Only the leaf name changes; selection, share state and other fields of
+   * the in-memory node are preserved. The list is re-sorted because the
+   * name is part of the default sort order.
+   *
+   * @param {FsNode} fsNode - Node from `elements` to rename.
+   * @param {string} name - New leaf name.
+   * @returns {Promise<Object>} Backend node payload.
+   */
+  renameFsNode(fsNode, name) {
+    return m.request(m.buildPathname(API_V1_FSNODE_BY_ID, { id: fsNode.id }), {
+      method: "PATCH",
+      body: { name },
+    }).then((data) => {
+      fsNode.name = data.name;
+      fsNode.modified_at = data.modified_at;
+      this.sortElements();
+      return data;
+    });
+  }
+
+  /**
    * Create or reactivate a public share for a node by its UUID.
    *
    * @param {FsNode} fsNode - Node from `elements` to share.

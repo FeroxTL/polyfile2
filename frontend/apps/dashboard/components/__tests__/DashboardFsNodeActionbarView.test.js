@@ -82,6 +82,31 @@ describe("DashboardFsNodeActionbarView", () => {
     expect(onShare).toHaveBeenCalledWith(selectedItem);
   });
 
+  it("opens the rename modal for the selected item", () => {
+    const selectedItem = {
+      name: "file.txt",
+      type: "file",
+      download_url: "/download/file/",
+    };
+    const onRename = vi.fn();
+    const [, , renameLink] = getActions(renderActionbar([selectedItem], { onRename }));
+
+    expect(renameLink.attrs.className).not.toContain("disabled");
+
+    renameLink.attrs.onclick({ preventDefault: vi.fn() });
+
+    expect(onRename).toHaveBeenCalledWith(selectedItem);
+  });
+
+  it("disables rename when several items are selected", () => {
+    const [, , renameLink] = getActions(renderActionbar([
+      { name: "a.txt", type: "file", download_url: "/download/a/" },
+      { name: "b.txt", type: "file", download_url: "/download/b/" },
+    ]));
+
+    expect(renameLink.attrs.className).toContain("disabled");
+  });
+
   it("clears the selection from the close button", () => {
     const onClose = vi.fn();
     const actions = getActions(renderActionbar([

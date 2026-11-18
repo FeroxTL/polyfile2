@@ -158,6 +158,7 @@ describe("TrashDashboardView", () => {
 
   it("clears the selection on a document click outside marked areas", () => {
     vi.spyOn(m, "redraw").mockReturnValue(null);
+    vi.spyOn(TrashList, "load").mockResolvedValue({});
     const vnode = { state: {} };
     TrashDashboardView.oninit(vnode);
 
@@ -172,6 +173,7 @@ describe("TrashDashboardView", () => {
 
   it("keeps the selection when the click happens inside an ignored area", () => {
     vi.spyOn(m, "redraw").mockReturnValue(null);
+    vi.spyOn(TrashList, "load").mockResolvedValue({});
     const vnode = { state: {} };
     TrashDashboardView.oninit(vnode);
 

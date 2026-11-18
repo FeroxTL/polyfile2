@@ -60,6 +60,24 @@ export class FsNodeList {
     return this.error !== null;
   }
 
+  /**
+   * Sorter configured for the currently listed node.
+   *
+   * @returns {Function} Comparator for `this.elements`.
+   */
+  getSorter() {
+    return Sorters[this.current?.sorting || "default"] || Sorters.default;
+  }
+
+  /**
+   * Sort the current elements in place.
+   *
+   * @returns {void}
+   */
+  sortElements() {
+    this.elements.sort(this.getSorter());
+  }
+
   load(url, params) {
     if (this.xhr !== null) {this.xhr.abort();}
 
@@ -73,8 +91,8 @@ export class FsNodeList {
       this.current = new this.FsNodeCls(data.current);
       this.ancestors = data.ancestors || [];
 
-      const sorter = Sorters[this.current.sorting || "default"];
-      this.elements = data.children.map((child) => new this.FsNodeCls(child)).sort(sorter);
+      this.elements = data.children.map((child) => new this.FsNodeCls(child));
+      this.sortElements();
     })
     .catch(error => {
       this.error = error;
@@ -94,13 +112,8 @@ export class FsNodeList {
    * Add FsNode respecting sorting
    */
   addFsNode(fsNode) {
-    const sorter = Sorters[this.current.sorting || "default"];
-    for (let i = 0; i < this.elements.length; i++) {
-      if (sorter(this.elements[i], fsNode) > 0) {
-        return this.elements.splice(i, 0, fsNode);
-      }
-    }
     this.elements.push(fsNode);
+    this.sortElements();
     return this.elements;
   }
 }

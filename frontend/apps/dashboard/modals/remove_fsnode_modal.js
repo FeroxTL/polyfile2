@@ -5,21 +5,9 @@ import {
 import { API_V1_FSNODE_BY_ID } from "../constants/endpoints";
 import Button from "@polyfile/core/ui-kit/button";
 import {DashboardFsNodeList} from "../services/DashboardFsNodeList";
+import { getApiErrorDetail } from "./errors";
 import m from "mithril";
 
-
-const getDetailFromError = (error) => {
-  if (error.code === 0 || error.response === null) {
-    return "Unknown error, please try again later";
-  }
-  if (Object.hasOwn(error.response, "detail")) {
-    if (Array.isArray(error.response.detail)) {
-      return error.response.detail.join("; ");
-    } 
-    return String(error.response.detail);
-  }
-  return "";
-};
 
 const sendRequest = (vnode) => {
   vnode.state.error = null;
@@ -78,7 +66,7 @@ const RemoveFsNodeModalComponent = {
               },
             }, [
               m(".modal-body", [
-                vnode.state.error && m(".alert alert-danger", getDetailFromError(vnode.state.error)),
+                vnode.state.error && m(".alert alert-danger", getApiErrorDetail(vnode.state.error)),
                 permanent
                   ? m("p", `${count === 1 ? "This item" : "These items"} will be deleted immediately and forever. Items already in the Trash will stay in the Trash. This cannot be undone.`)
                   : m("p", `${count === 1 ? "This item" : "These items"} will be moved to the Trash and kept for 30 days. You can restore them later.`),

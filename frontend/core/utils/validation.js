@@ -19,3 +19,32 @@ export function ensureAttribute(value) {
   }
   return value;
 }
+
+/*
+ * Mirrors `polyfile/apps/storage/schemas.py`: cross-platform reserved
+ * characters and the FsNode.name length limit.
+ */
+const RESERVED_FS_NODE_NAME_CHARACTERS = /[<>:"/\\|?*]/u;
+const MAX_FS_NODE_NAME_LENGTH = 255;
+
+/**
+ * Validate a file or directory name before sending it to the backend.
+ *
+ * @param {string} name - Proposed FsNode name.
+ * @returns {string[]} Human-readable validation errors (empty when valid).
+ */
+export function getFsNodeNameErrors(name) {
+  if (!name) {
+    return ["Name is required"];
+  }
+  if (name.length > MAX_FS_NODE_NAME_LENGTH) {
+    return [`Name is too long (${MAX_FS_NODE_NAME_LENGTH} characters max)`];
+  }
+  if (name === "." || name === "..") {
+    return ['Directory name can not be "." or ".."'];
+  }
+  if (RESERVED_FS_NODE_NAME_CHARACTERS.test(name)) {
+    return ['Name contains reserved characters: < > : " / \\ | ? *'];
+  }
+  return [];
+}

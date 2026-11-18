@@ -189,6 +189,11 @@ class FsNodeTouchRequestSchema(FsNodeCreateByNameRequestSchema):
     replace = fields.Bool(load_default=False)
 
 
+class FsNodeRenameRequestSchema(Schema):
+    """FsNode rename params: the new leaf name."""
+    name = fields.Str(required=True, validate=get_fs_node_name_validator())
+
+
 # == Trash ==
 
 RESTORE_CONFLICT_FAIL = "fail"

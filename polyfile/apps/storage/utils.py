@@ -8,7 +8,7 @@ from pathlib import PurePosixPath
 import magic
 import marshmallow
 from django.core.files import File
-from django.db import models, transaction
+from django.db import IntegrityError, models, transaction
 from django.db.models import Q
 from django.utils.timezone import now
 from django_cte import CTE, with_cte
@@ -172,6 +172,36 @@ def get_fs_node_with_children_by_id(
     )
 
 
+def _fs_node_exists_error(existing: FsNode) -> exceptions.FsNodeExistsError:
+    """Build the API error describing an active sibling with the same name."""
+    existing_kind = "Directory" if existing.is_directory else "File"
+    return exceptions.FsNodeExistsError(
+        detail=f'{existing_kind} named "{existing.name}" already exists',
+        extra={
+            "existing_node_id": str(existing.pk),
+            "existing_type": existing.type,
+        },
+    )
+
+
+def _get_active_sibling(
+        user: User,
+        fs_node: FsNode,
+        name: str,
+) -> FsNode | None:
+    """Return an active sibling of ``fs_node`` with ``name``, if any."""
+    return (
+        FsNode.active.filter(
+            owner=user,
+            storage_id=fs_node.storage_id,
+            parent_id=fs_node.parent_id,
+            name=name,
+        )
+        .exclude(pk=fs_node.pk)
+        .first()
+    )
+
+
 def create_fs_node(
         user: User,
         parent_id: uuid.UUID | None,
@@ -225,14 +255,61 @@ def create_fs_node(
         if replace and fs_node_type == FsNode.TypeChoices.FILE and fs_node.is_file:
             return fs_node
 
-        existing_kind = "Directory" if fs_node.is_directory else "File"
-        raise exceptions.FsNodeExistsError(
-            detail=f'{existing_kind} named "{name}" already exists',
-            extra={
-                "existing_node_id": str(fs_node.pk),
-                "existing_type": fs_node.type,
-            },
+        raise _fs_node_exists_error(fs_node)
+    return fs_node
+
+
+def rename_fs_node(
+        user: User,
+        node_id: uuid.UUID,
+        name: str,
+) -> FsNode:
+    """
+    Rename an active FsNode (file/directory) without moving it.
+
+    Only the leaf name changes: the UUID, parent, share links and the
+    physical object key stay intact. The name is validated with the same
+    rules as :func:`create_fs_node`, and an active sibling with the same
+    name is rejected with ``FsNodeExistsError``.
+
+    :param user: FsNode owner.
+    :param node_id: UUID of the node to rename.
+    :param name: new leaf name.
+    :raises HttpException: most of the errors.
+    :return: renamed FsNode.
+    """
+    try:
+        get_fs_node_name_validator()(name)
+    except marshmallow.ValidationError as e:
+        raise exceptions.InvalidFsNodeName(detail=', '.join(e.messages))
+
+    try:
+        fs_node = FsNode.active.get(id=node_id, owner=user)
+    except FsNode.DoesNotExist:
+        raise exceptions.FsNodeNotFoundError(
+            detail=f'Can not access node "{node_id}" - no such file or directory',
         )
+
+    if fs_node.name == name:
+        return fs_node
+
+    previous_name = fs_node.name
+    fs_node.name = name
+    try:
+        # The savepoint keeps a caught IntegrityError from poisoning an outer
+        # transaction (Django tests wrap each test in one) and lets the
+        # conflict lookup run afterwards.
+        with transaction.atomic():
+            fs_node.save(update_fields=("name",))
+    except IntegrityError as exc:
+        # The partial unique constraint is the final guard: a concurrent
+        # create/rename may have created the sibling after our lookup.
+        fs_node.name = previous_name
+        conflict = _get_active_sibling(user=user, fs_node=fs_node, name=name)
+        if conflict is not None:
+            raise _fs_node_exists_error(conflict) from exc
+        raise
+
     return fs_node
 
 

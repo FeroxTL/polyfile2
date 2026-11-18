@@ -1,4 +1,3 @@
-import json
 import uuid
 
 import marshmallow
@@ -20,6 +19,7 @@ from polyfile.apps.storage.utils import (
     get_fs_node_with_children,
     get_fs_node_with_children_by_id,
     remove_fs_node,
+    rename_fs_node,
 )
 from polyfile.core import exceptions
 from polyfile.core.api import BaseApiView
@@ -27,6 +27,8 @@ from polyfile.core.rest.generics import CreateApiView
 
 
 class FsNodeListApiView(BaseApiView):
+    serializer_class = schemas.FsNodeRenameRequestSchema
+
     @staticmethod
     def get(request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:
         """Retrieve FsNode (file/directory) by UUID or path and its children (if any)."""
@@ -48,6 +50,22 @@ class FsNodeListApiView(BaseApiView):
         with schemas.ShareUrlRequestContext(request):
             data = schemas.FsNodeListResponseSchema().dump(fs_node_with_children)
         return http.JsonResponse(data=data)
+
+    @classmethod
+    def patch(cls, request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:
+        """Rename an FsNode by UUID; only the leaf name changes."""
+        assert request.user.is_authenticated and isinstance(request.user, User)
+
+        if node_id is None:
+            raise exceptions.BadRequest("node_id is required")
+
+        params = cls.load_params(request)
+        fs_node = rename_fs_node(
+            user=request.user,
+            node_id=node_id,
+            name=params["name"],
+        )
+        return cls.json_response(schemas.FsNodeItemSchema().dump(fs_node))
 
     @staticmethod
     def delete(request: RequestType, node_id: uuid.UUID | None = None) -> http.HttpResponse:

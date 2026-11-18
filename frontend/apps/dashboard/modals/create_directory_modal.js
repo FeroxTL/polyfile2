@@ -7,25 +7,13 @@ import {
 import { API_V1_FSNODE_MKDIR } from "../constants/endpoints";
 import Button from "@polyfile/core/ui-kit/button";
 import {Input} from "@polyfile/core/ui-kit/input";
+import { getFsNodeNameErrors } from "@polyfile/core/utils/validation";
+import { getApiErrorDetail } from "./errors";
 import m from "mithril";
 import stream from "mithril/stream";
 
-const ERROR_CODE_ZERO = 0;
 const RESPONSE_BAD_REQUEST = 400;
 const RESPONSE_SERVER_ERROR = 500;
-
-const getDetailFromError = (error) => {
-  if (error.code === ERROR_CODE_ZERO || error.response === null) {
-    return "Unknown error, please try again later";
-  }
-  if (Object.hasOwn(error.response, "detail")) {
-    if (Array.isArray(error.response.detail)) {
-      return error.response.detail.join("; ");
-    } 
-    return String(error.response.detail);
-  }
-  return "";
-};
 
 
 const sendRequest = (vnode) => {
@@ -45,7 +33,7 @@ const sendRequest = (vnode) => {
     DashboardFsNodeList.selectFsNode(fsNode);
   }, (error) => {
     if (error.code >= RESPONSE_BAD_REQUEST && error.code < RESPONSE_SERVER_ERROR) {
-      vnode.state.fieldErrors.push(getDetailFromError(error));
+      vnode.state.fieldErrors.push(getApiErrorDetail(error));
     } else {
       vnode.state.error = error;
     }
@@ -62,13 +50,7 @@ const CreateDirectoryModal = {
 
   validateValue(vnode, value) {
     vnode.state.fieldErrors.length = 0;
-    const slashRegex = /^[^/]*$/ugm;
-    if (!slashRegex.test(value)) {
-      vnode.state.fieldErrors.push("Do no use symbol \"/\"");
-    }
-    if (!value) {
-      vnode.state.fieldErrors.push("");
-    }
+    vnode.state.fieldErrors.push(...getFsNodeNameErrors(value));
   },
 
   view(vnode) {
@@ -89,7 +71,7 @@ const CreateDirectoryModal = {
               },
             }, [
               m(".modal-body", [
-                vnode.state.error && m(".alert alert-danger", getDetailFromError(vnode.state.error)),
+                vnode.state.error && m(".alert alert-danger", getApiErrorDetail(vnode.state.error)),
                 m(".mb-3",
                   m(Input, {
                     stream: vnode.state.valueStream,

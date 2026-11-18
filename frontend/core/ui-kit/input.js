@@ -22,6 +22,7 @@ const Input = {
       placeholder,
       readOnly,
       required,
+      selectOnFocus,
       stream,
       type,
       value,
@@ -47,6 +48,9 @@ const Input = {
         oncreate: (inputVnode) => {
           if (autofocus) {
             inputVnode.dom.focus();
+          }
+          if (selectOnFocus) {
+            inputVnode.dom.select();
           }
         },
         oninput: (event) => {
